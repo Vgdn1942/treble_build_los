@@ -1,0 +1,92 @@
+From 301f447afc01ccbd555fe43b0b422ea5a3fbf774 Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Wed, 5 Aug 2020 20:14:51 +0300
+Subject: [PATCH] Releasekey & description
+
+Change-Id: I829ed1a8a214b7f5f13889029ed23365c240dc04
+---
+ target/product/security/releasekey.pk8      | Bin 0 -> 1216 bytes
+ target/product/security/releasekey.x509.pem |  23 ++++++++++++++++++++
+ tools/buildinfo.sh                          |   2 +-
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+ create mode 100644 target/product/security/releasekey.pk8
+ create mode 100644 target/product/security/releasekey.x509.pem
+
+diff --git a/target/product/security/releasekey.pk8 b/target/product/security/releasekey.pk8
+new file mode 100644
+index 0000000000000000000000000000000000000000..e4e0e8f1662354d0cf82e045398aacf028ffdc4f
+GIT binary patch
+literal 1216
+zcmV;x1V8&Qf&{z*0RS)!1_>&LNQU<f0RaI800e>rrZ9p8q5=T`0)hbn0IevRKi=r_
+zP^99sm*`!gwBEXu^8c4y!4vC1f8;^M``D}h1uN^^5a$bo9>Qo*7B;kyE<iBqYaA;X
+z5;tqr4$WcIy5NHeAoZ<ye(L7lt{tEdVQ2wS%QoGaOgqhAMepP}dRRKbojU+8<DVHa
+z^y)fvpxCKS78M-1H@Yf6&)ZXr3hl7$dy>eJcn-Nfq)D)6!{%If0hFfXij6#^MuL09
+zeSnMQ#U+=FToVdRLh{lEO!b?viXrxlp8j|ljgba$Q>OW~I;LC#3BQpoQpA%m`{{g?
+z7Uf280qNatz64C?8V3swR>VY7OITFiIOJ|h%S?<5tN!TV(w{DI2Lb^D0)hbmb8u$W
+zKSlQ7ZR~ftn&}pJlzd}Ms$}SZxAH3g?SU?*<;VY6$MTZ3?_C1FEJcfCBzRyR)phZl
+zy>bw?&z(55i0k7gKv!F9PIINH@$Ww#zG}6WMOHS4dFc?{eKVBVN|+{5kS8o?(f}Xr
+z6uWm#@qA6dkZ|6)V`zJNd>kr?c{wKAe0(YU`C;2<lS8~^3O15rr;xs;PgH_6fcY(r
+znO)Rt>UVpc)@HeM(FmI88rnxO#w4q^OY;8fu;>W}!rm*LJ)+ZajfY=4F<otw9b+Yg
+zUa6ny%lL%P3x|bo5rnLvKi;k*JOxdW8<*CmmWTj4^a3I~1-9?B${4nb0)c@5+xc2;
+zygl^<SXlE+so+-4(hoNUx2A3YBoQ8_P%9{nMdY!#NGp`5B38GKtt0!5HiFNi9AsMC
+zNdunl<GoWu!b-d{D@l(bgG~9FzcaWoj6oe(J;kaH<vJLkom=4wkeIVPGmTL_7b|(_
+z<pN6a+8}oTPX>MhrF?bJl{O}s0)c@5$%J-O_PDrxL|oMn2lGun=ucHDGhFKj`IiEd
+z`<u69){0akSgjYaL8iW*ELmt-ln2Y-FaT5==LT<1kzTmJs%~<%pF8OAPQ&?^woy>T
+zj6GXj9k_ZaP8X0WyEa9P*=;cE^RKt$(-7nc$?nljD1p;*kAhlI(AooX+S53n0)c@5
+zlBPUKC@D??<&dH?8|vhVHnh)KB^jQo!nPD{;2g!XgYC=EFdYrV!H*>g$ik<yd8~?T
+zy_h_bFs&4yLVh=bfrls|axn@PSBR!(Dk6HzvepxjDK2qeLwpcx6Oxt(3lMjGce9Ir
+z4{}jO?g58O=D<%?iUd>v!>CS+4kQ`70)c@5hFDJGq<bZ(*gfN51x(&4@HFFbcauk2
+zrev&Qr@bWY<XkuxkaJ}q)^91k$UB<mVz1plbybaL?^&OTwm&7+97&<hYA5iZG=ipO
+zBsMkJU4A_1zIyx{iDe4MCwYUjJDwn&O&`zg;tN8shMzVwa8``>3RdRei#!5Mk>Vx4
+z0)c>Hv;V5a$q4fDITfiibpVC7ST_Ql(CSAuXys>0FAx;oHnKQcJo%R1wL|l6;-M*l
+zQ|SRe^J!mh6Y2K)e#!s{%pEM_c0mo-{0--g3p_8?VGjLO5-X4)f=ZhjU%!_Dj`5W@
+ejeBXYjkVpz-Ag}(2N=eg)U9%`$}n&Bs3)FfWj<X1
+
+literal 0
+HcmV?d00001
+
+diff --git a/target/product/security/releasekey.x509.pem b/target/product/security/releasekey.x509.pem
+new file mode 100644
+index 000000000..1e28f5ed8
+--- /dev/null
++++ b/target/product/security/releasekey.x509.pem
+@@ -0,0 +1,23 @@
++-----BEGIN CERTIFICATE-----
++MIID7DCCAtSgAwIBAgIJAL+cOPN2Xn45MA0GCSqGSIb3DQEBCwUAMIGLMQswCQYD
++VQQGEwJCWTEQMA4GA1UECAwHQmVsYXJ1czEOMAwGA1UEBwwFTWluc2sxETAPBgNV
++BAoMCHZnZG4xOTQyMREwDwYDVQQLDAh2Z2RuMTk0MjERMA8GA1UEAwwIdmdkbjE5
++NDIxITAfBgkqhkiG9w0BCQEWEnZnZG4xOTQyQGdtYWlsLmNvbTAeFw0xOTA2MTAx
++MTM1MjhaFw00NjEwMjYxMTM1MjhaMIGLMQswCQYDVQQGEwJCWTEQMA4GA1UECAwH
++QmVsYXJ1czEOMAwGA1UEBwwFTWluc2sxETAPBgNVBAoMCHZnZG4xOTQyMREwDwYD
++VQQLDAh2Z2RuMTk0MjERMA8GA1UEAwwIdmdkbjE5NDIxITAfBgkqhkiG9w0BCQEW
++EnZnZG4xOTQyQGdtYWlsLmNvbTCCASAwDQYJKoZIhvcNAQEBBQADggENADCCAQgC
++ggEBAK0omj/e6PJQpOKzl+hdobTeupTy/5dcwRPrQH/kQcX72Kv/BSvr3BDnC4Qe
++wmhRFja0kC5AMOprHCsZEjdr1Q7NYdS64IMJIPWteH7q5t6uHaAQYWgBUcs23ZlM
++O81fRe/kOXpYOsKdOwAv458ZMvTqOnSg2KlOFhUcuTe6Kj/P21OLCu2w7HuSyJF4
++Drk+pEmwZ8PmXHcBlKbkio08pEaCe8R9gIvlxSWXjFwTCkxC8tIGTPWbsIoh9oye
++/ngZjZEGcFOm+bU6plwCCb+RLVLEkzD76XyUFuVGcAHp3W6+BEznGgcLDlbERFJL
++WFTeOORuSstMjAur/ujg0p8ucQcCAQOjUzBRMB0GA1UdDgQWBBRxgURrXvAzZnjj
++PPbkWgPYrSX4CDAfBgNVHSMEGDAWgBRxgURrXvAzZnjjPPbkWgPYrSX4CDAPBgNV
++HRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCgv7ImX0XswDwreqvjlmwz
++uijlIRMjP8VJruX8qIpieegrEh2VibesK/6EmiyvH2KP4MBnU9BqDPzruzs4Zpoc
++SRKXRU/6xZJecl3++QGI5Ap2LjRI1v7u7PeHdmCNPG2GXrk7HUU1ujaWJToRqec5
++2iZq/ahZAk4DGOOlPmu3dTt8DcpC4PmcZ9yQXIhBL/vpf1KpI4OYSxOsNtVIAZzm
++AOnT548Xh+vqepJ/4kK80K5AyNlFJSYuhWcY+PKepeNZVp7ByrGN4Gx9nW1ctQhO
++eWe/KGYWe9XwzHDEljhB+BKDpTtxbzy0+UyJ+ScNvGEU6CCKE362no7kKiDgjpRv
++-----END CERTIFICATE-----
+diff --git a/tools/buildinfo.sh b/tools/buildinfo.sh
+index d7f3b96a3..e5c3237ff 100755
+--- a/tools/buildinfo.sh
++++ b/tools/buildinfo.sh
+@@ -50,7 +50,7 @@ echo "# ro.build.product is obsolete; use ro.product.device"
+ echo "ro.build.product=$TARGET_DEVICE"
+ 
+ echo "# Do not try to parse description or thumbprint"
+-echo "ro.build.description=$PRIVATE_BUILD_DESC"
++echo "ro.build.description=BV9500Plus_EEA-user 9 PPR1.180610.011 root.20190813.133031 release-keys"
+ if [ -n "$BUILD_THUMBPRINT" ] ; then
+   echo "ro.build.thumbprint=$BUILD_THUMBPRINT"
+ fi
+-- 
+2.20.1
+

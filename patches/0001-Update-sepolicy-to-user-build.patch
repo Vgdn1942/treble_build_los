@@ -1,0 +1,293 @@
+From 31cdb6c9d851385a5520fb45499ea11bc701a875 Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Sun, 26 Jul 2020 19:51:58 +0300
+Subject: [PATCH] Update sepolicy to user build
+
+Change-Id: I1a94a08fecc614b15c2347945ad1f84b77c8e8af
+---
+ prebuilts/api/29.0/private/coredomain.te |  2 ++
+ prebuilts/api/29.0/private/domain.te     |  1 +
+ prebuilts/api/29.0/public/app.te         |  2 +-
+ prebuilts/api/29.0/public/domain.te      |  4 ++++
+ prebuilts/api/29.0/public/te_macros      |  2 +-
+ prebuilts/api/29.0/public/uncrypt.te     |  8 ++-----
+ private/coredomain.te                    |  2 ++
+ private/domain.te                        |  1 +
+ private/vndk_detect.te                   | 27 ++++++++++++++++++++++++
+ public/app.te                            |  2 +-
+ public/domain.te                         |  4 ++++
+ public/te_macros                         |  2 +-
+ public/uncrypt.te                        |  8 ++-----
+ vendor/hal_fingerprint_default.te        |  1 +
+ 14 files changed, 50 insertions(+), 16 deletions(-)
+ create mode 100644 private/vndk_detect.te
+
+diff --git a/prebuilts/api/29.0/private/coredomain.te b/prebuilts/api/29.0/private/coredomain.te
+index 169f6b24..5462da7f 100644
+--- a/prebuilts/api/29.0/private/coredomain.te
++++ b/prebuilts/api/29.0/private/coredomain.te
+@@ -93,6 +93,7 @@ full_treble_only(`
+   neverallow {
+     coredomain
+     -init
++    -ueventd
+     -vold
+   } proc:file no_rw_file_perms;
+ 
+@@ -101,6 +102,7 @@ full_treble_only(`
+     coredomain
+     -init
+     -ueventd
++    -vndk_detect
+     -vold
+   } sysfs:file no_rw_file_perms;
+ 
+diff --git a/prebuilts/api/29.0/private/domain.te b/prebuilts/api/29.0/private/domain.te
+index 209eeb0d..26996940 100644
+--- a/prebuilts/api/29.0/private/domain.te
++++ b/prebuilts/api/29.0/private/domain.te
+@@ -88,6 +88,7 @@ neverallow {
+   domain
+   -vold
+   userdebug_or_eng(`-llkd')
++  -lmkd
+   -dumpstate
+   userdebug_or_eng(`-incidentd')
+   -storaged
+diff --git a/prebuilts/api/29.0/public/app.te b/prebuilts/api/29.0/public/app.te
+index 5c48e71f..ca8da0ff 100644
+--- a/prebuilts/api/29.0/public/app.te
++++ b/prebuilts/api/29.0/public/app.te
+@@ -493,7 +493,7 @@ neverallow appdomain
+     { create write setattr relabelfrom relabelto append unlink link rename };
+ neverallow appdomain
+     wifi_data_file:dir_file_class_set
+-    { create write setattr relabelfrom relabelto append unlink link rename };
++    { relabelfrom relabelto link };
+ neverallow appdomain
+     dhcp_data_file:dir_file_class_set
+     { create write setattr relabelfrom relabelto append unlink link rename };
+diff --git a/prebuilts/api/29.0/public/domain.te b/prebuilts/api/29.0/public/domain.te
+index 6f3a19cd..aee90b52 100644
+--- a/prebuilts/api/29.0/public/domain.te
++++ b/prebuilts/api/29.0/public/domain.te
+@@ -858,6 +858,7 @@ full_treble_only(`
+     # files in /data/misc/zoneinfo/tzdata and /system/usr/share/zoneinfo/tzdata.
+     # These functions are considered vndk-stable and thus must be allowed for
+     # all processes.
++    -wifi_data_file
+     -zoneinfo_data_file
+     with_native_coverage(`-method_trace_data_file')
+   }:file_class_set ~{ append getattr ioctl read write map };
+@@ -886,6 +887,7 @@ full_treble_only(`
+     core_data_file_type
+     -system_data_file # default label for files on /data. Covered below...
+     -vendor_data_file
++    -wifi_data_file
+     -zoneinfo_data_file
+     with_native_coverage(`-method_trace_data_file')
+   }:dir *;
+@@ -1401,6 +1403,8 @@ full_treble_only(`
+     -charger
+     # TODO(b/110891300): remove this exception
+     -incidentd
++    # Use by treble app.
++    -system_app
+   } sysfs_batteryinfo:file { open read };
+ ')
+ 
+diff --git a/prebuilts/api/29.0/public/te_macros b/prebuilts/api/29.0/public/te_macros
+index 85783dc9..2f519e71 100644
+--- a/prebuilts/api/29.0/public/te_macros
++++ b/prebuilts/api/29.0/public/te_macros
+@@ -639,7 +639,7 @@ define(`hal_attribute_hwservice', `
+   add_hwservice($1_server, $2)
+ 
+   build_test_only(`
+-    neverallow { domain -$1_client -$1_server } $2:hwservice_manager find;
++    neverallow { domain -system_app -$1_client -$1_server } $2:hwservice_manager find;
+   ')
+ ')
+ 
+diff --git a/prebuilts/api/29.0/public/uncrypt.te b/prebuilts/api/29.0/public/uncrypt.te
+index d4408026..5131b944 100644
+--- a/prebuilts/api/29.0/public/uncrypt.te
++++ b/prebuilts/api/29.0/public/uncrypt.te
+@@ -15,9 +15,9 @@ allow uncrypt cache_file:dir search;
+ allow uncrypt cache_recovery_file:dir rw_dir_perms;
+ allow uncrypt cache_recovery_file:file create_file_perms;
+ 
+-# Read and write(for f2fs_pin_file) on OTA zip file at /data/ota_package/.
++# Read OTA zip file at /data/ota_package/.
+ allow uncrypt ota_package_file:dir r_dir_perms;
+-allow uncrypt ota_package_file:file rw_file_perms;
++allow uncrypt ota_package_file:file r_file_perms;
+ 
+ # Write to /dev/socket/uncrypt
+ unix_socket_connect(uncrypt, uncrypt, uncrypt)
+@@ -43,7 +43,3 @@ r_dir_file(uncrypt, sysfs_dt_firmware_android)
+ 
+ # Read files in /proc
+ r_dir_file(uncrypt, proc_dt_firmware_android)
+-
+-# Suppress the denials coming from ReadDefaultFstab call.
+-dontaudit uncrypt gsi_metadata_file:dir search;
+-dontaudit uncrypt metadata_file:dir search;
+diff --git a/private/coredomain.te b/private/coredomain.te
+index 169f6b24..5462da7f 100644
+--- a/private/coredomain.te
++++ b/private/coredomain.te
+@@ -93,6 +93,7 @@ full_treble_only(`
+   neverallow {
+     coredomain
+     -init
++    -ueventd
+     -vold
+   } proc:file no_rw_file_perms;
+ 
+@@ -101,6 +102,7 @@ full_treble_only(`
+     coredomain
+     -init
+     -ueventd
++    -vndk_detect
+     -vold
+   } sysfs:file no_rw_file_perms;
+ 
+diff --git a/private/domain.te b/private/domain.te
+index 209eeb0d..26996940 100644
+--- a/private/domain.te
++++ b/private/domain.te
+@@ -88,6 +88,7 @@ neverallow {
+   domain
+   -vold
+   userdebug_or_eng(`-llkd')
++  -lmkd
+   -dumpstate
+   userdebug_or_eng(`-incidentd')
+   -storaged
+diff --git a/private/vndk_detect.te b/private/vndk_detect.te
+new file mode 100644
+index 00000000..797094ac
+--- /dev/null
++++ b/private/vndk_detect.te
+@@ -0,0 +1,27 @@
++type vndk_detect, coredomain, domain;
++type vndk_detect_exec, exec_type, file_type;
++
++init_daemon_domain(vndk_detect);
++allow vndk_detect sepolicy_file:file r_file_perms;
++set_prop(vndk_detect,system_prop);
++set_prop(vndk_detect,debug_prop);
++
++allow vndk_detect shell_exec:file rx_file_perms;
++allow vndk_detect toolbox_exec:file rx_file_perms;
++#/system/bin/grep
++allow vndk_detect system_file:file rx_file_perms;
++
++#mount -o bind /system/bin/adbd /sbin/adbd
++allow vndk_detect adbd_exec:file { getattr read };
++allow vndk_detect rootfs:file { mounton getattr };
++allow vndk_detect self:capability { sys_admin };
++
++#mount -o bind /system/etc/usb_audio_policy_configuration.xml /vendor/etc/usb_audio_policy_configuration.xml
++allow init vendor_configs_file:file { getattr mounton };
++
++#/sys/module/five
++allow vndk_detect sysfs:file r_file_perms;
++allow vndk_detect sysfs:dir r_dir_perms;
++
++#/proc/filesystems
++allow vndk_detect proc_filesystems:file r_file_perms;
+diff --git a/public/app.te b/public/app.te
+index 5c48e71f..ca8da0ff 100644
+--- a/public/app.te
++++ b/public/app.te
+@@ -493,7 +493,7 @@ neverallow appdomain
+     { create write setattr relabelfrom relabelto append unlink link rename };
+ neverallow appdomain
+     wifi_data_file:dir_file_class_set
+-    { create write setattr relabelfrom relabelto append unlink link rename };
++    { relabelfrom relabelto link };
+ neverallow appdomain
+     dhcp_data_file:dir_file_class_set
+     { create write setattr relabelfrom relabelto append unlink link rename };
+diff --git a/public/domain.te b/public/domain.te
+index 6f3a19cd..aee90b52 100644
+--- a/public/domain.te
++++ b/public/domain.te
+@@ -858,6 +858,7 @@ full_treble_only(`
+     # files in /data/misc/zoneinfo/tzdata and /system/usr/share/zoneinfo/tzdata.
+     # These functions are considered vndk-stable and thus must be allowed for
+     # all processes.
++    -wifi_data_file
+     -zoneinfo_data_file
+     with_native_coverage(`-method_trace_data_file')
+   }:file_class_set ~{ append getattr ioctl read write map };
+@@ -886,6 +887,7 @@ full_treble_only(`
+     core_data_file_type
+     -system_data_file # default label for files on /data. Covered below...
+     -vendor_data_file
++    -wifi_data_file
+     -zoneinfo_data_file
+     with_native_coverage(`-method_trace_data_file')
+   }:dir *;
+@@ -1401,6 +1403,8 @@ full_treble_only(`
+     -charger
+     # TODO(b/110891300): remove this exception
+     -incidentd
++    # Use by treble app.
++    -system_app
+   } sysfs_batteryinfo:file { open read };
+ ')
+ 
+diff --git a/public/te_macros b/public/te_macros
+index 85783dc9..2f519e71 100644
+--- a/public/te_macros
++++ b/public/te_macros
+@@ -639,7 +639,7 @@ define(`hal_attribute_hwservice', `
+   add_hwservice($1_server, $2)
+ 
+   build_test_only(`
+-    neverallow { domain -$1_client -$1_server } $2:hwservice_manager find;
++    neverallow { domain -system_app -$1_client -$1_server } $2:hwservice_manager find;
+   ')
+ ')
+ 
+diff --git a/public/uncrypt.te b/public/uncrypt.te
+index d4408026..5131b944 100644
+--- a/public/uncrypt.te
++++ b/public/uncrypt.te
+@@ -15,9 +15,9 @@ allow uncrypt cache_file:dir search;
+ allow uncrypt cache_recovery_file:dir rw_dir_perms;
+ allow uncrypt cache_recovery_file:file create_file_perms;
+ 
+-# Read and write(for f2fs_pin_file) on OTA zip file at /data/ota_package/.
++# Read OTA zip file at /data/ota_package/.
+ allow uncrypt ota_package_file:dir r_dir_perms;
+-allow uncrypt ota_package_file:file rw_file_perms;
++allow uncrypt ota_package_file:file r_file_perms;
+ 
+ # Write to /dev/socket/uncrypt
+ unix_socket_connect(uncrypt, uncrypt, uncrypt)
+@@ -43,7 +43,3 @@ r_dir_file(uncrypt, sysfs_dt_firmware_android)
+ 
+ # Read files in /proc
+ r_dir_file(uncrypt, proc_dt_firmware_android)
+-
+-# Suppress the denials coming from ReadDefaultFstab call.
+-dontaudit uncrypt gsi_metadata_file:dir search;
+-dontaudit uncrypt metadata_file:dir search;
+diff --git a/vendor/hal_fingerprint_default.te b/vendor/hal_fingerprint_default.te
+index 638b6030..e118c06d 100644
+--- a/vendor/hal_fingerprint_default.te
++++ b/vendor/hal_fingerprint_default.te
+@@ -1,5 +1,6 @@
+ type hal_fingerprint_default, domain;
+ hal_server_domain(hal_fingerprint_default, hal_fingerprint)
++allow system_app hal_fingerprint_default:binder { call };
+ 
+ type hal_fingerprint_default_exec, exec_type, vendor_file_type, file_type;
+ init_daemon_domain(hal_fingerprint_default)
+-- 
+2.20.1
+

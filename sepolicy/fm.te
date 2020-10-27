@@ -1,0 +1,5 @@
+type fm_device, file_type;
+#type fm_firmware_file, file_type;
+
+allow system_app fm_device:chr_file rw_file_perms;
+#allow system_app fm_firmware_file:file { open read };

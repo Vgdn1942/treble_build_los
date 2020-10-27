@@ -1,0 +1,375 @@
+From c566b5e8b7a63b4f9c865c90369d11bfc2b70410 Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Thu, 8 Oct 2020 13:26:27 +0300
+Subject: [PATCH] Add PS helper and more
+
+Change-Id: Icf41d310010740dcc12caa8273d96816eb694c6e
+---
+ base.mk                                       |  5 ++
+ files/secure                                  |  0
+ pocketmode/Android.mk                         | 16 ++++
+ pocketmode/AndroidManifest.xml                | 45 ++++++++++
+ pocketmode/proguard.flags                     |  3 +
+ .../pocketmode/BootCompletedReceiver.java     | 36 ++++++++
+ .../pocketmode/PocketModeService.java         | 85 +++++++++++++++++++
+ .../lineageos/pocketmode/PressureSensor.java  | 83 ++++++++++++++++++
+ s62v71c2k_jk_eea.mk                           |  4 +-
+ sepolicy/fm.te                                |  2 +-
+ 11 files changed, 276 insertions(+), 3 deletions(-)
+ create mode 100644 files/secure
+ create mode 100644 pocketmode/Android.mk
+ create mode 100644 pocketmode/AndroidManifest.xml
+ create mode 100644 pocketmode/proguard.flags
+ create mode 100644 pocketmode/src/org/lineageos/pocketmode/BootCompletedReceiver.java
+ create mode 100644 pocketmode/src/org/lineageos/pocketmode/PocketModeService.java
+ create mode 100644 pocketmode/src/org/lineageos/pocketmode/PressureSensor.java
+
+diff --git a/base.mk b/base.mk
+index b2b18d8..3dcde77 100644
+--- a/base.mk
++++ b/base.mk
+@@ -129,6 +129,11 @@ PRODUCT_COPY_FILES += \
+ 	device/phh/treble/files/zf6-goodixfp.kl:system/phh/zf6-goodixfp.kl \
+ 	device/phh/treble/files/zf6-googlekey_input.kl:system/phh/zf6-googlekey_input.kl \
+ 
++ifneq ($(WITH_SU), true)
++PRODUCT_COPY_FILES += \
++	device/phh/treble/files/secure:system/phh/secure
++endif
++
+ SELINUX_IGNORE_NEVERALLOWS := false
+ 
+ # FM
+diff --git a/files/secure b/files/secure
+new file mode 100644
+index 0000000..e69de29
+diff --git a/pocketmode/Android.mk b/pocketmode/Android.mk
+new file mode 100644
+index 0000000..d91e4d5
+--- /dev/null
++++ b/pocketmode/Android.mk
+@@ -0,0 +1,16 @@
++LOCAL_PATH:= $(call my-dir)
++
++include $(CLEAR_VARS)
++
++LOCAL_MODULE_TAGS := optional
++
++LOCAL_SRC_FILES := $(call all-java-files-under, src)
++
++LOCAL_PACKAGE_NAME := ProximityHelper
++LOCAL_CERTIFICATE := platform
++LOCAL_PRIVATE_PLATFORM_APIS := true
++LOCAL_PRIVILEGED_MODULE := true
++
++LOCAL_PROGUARD_FLAG_FILES := proguard.flags
++
++include $(BUILD_PACKAGE)
+diff --git a/pocketmode/AndroidManifest.xml b/pocketmode/AndroidManifest.xml
+new file mode 100644
+index 0000000..20f61da
+--- /dev/null
++++ b/pocketmode/AndroidManifest.xml
+@@ -0,0 +1,45 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     Copyright (C) 2016 The CyanogenMod Project
++     Copyright (C) 2017-2018 The LineageOS Project
++
++     Licensed under the Apache License, Version 2.0 (the "License"
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="org.lineageos.pocketmode"
++    android:versionCode="1"
++    android:versionName="1.0"
++    android:sharedUserId="android.uid.system">
++
++    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
++
++    <uses-sdk
++        android:minSdkVersion="27" />
++
++    <application
++        android:label="ProximityHelper"
++        android:persistent="true">
++
++        <receiver android:name=".BootCompletedReceiver">
++            <intent-filter>
++                <action android:name="android.intent.action.BOOT_COMPLETED" />
++                <category android:name="android.intent.category.DEFAULT" />
++            </intent-filter>
++        </receiver>
++
++        <service android:name=".PocketModeService"
++                 android:permission="PocketModeService">
++        </service>
++
++    </application>
++</manifest>
+diff --git a/pocketmode/proguard.flags b/pocketmode/proguard.flags
+new file mode 100644
+index 0000000..2087239
+--- /dev/null
++++ b/pocketmode/proguard.flags
+@@ -0,0 +1,3 @@
++-keep class org.lineageos.pocketmode.* {
++  *;
++}
+diff --git a/pocketmode/src/org/lineageos/pocketmode/BootCompletedReceiver.java b/pocketmode/src/org/lineageos/pocketmode/BootCompletedReceiver.java
+new file mode 100644
+index 0000000..544e2a0
+--- /dev/null
++++ b/pocketmode/src/org/lineageos/pocketmode/BootCompletedReceiver.java
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) 2016 The CyanogenMod Project
++ *               2017 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.lineageos.pocketmode;
++
++import android.content.BroadcastReceiver;
++import android.content.Context;
++import android.content.Intent;
++import android.os.UserHandle;
++import android.util.Log;
++
++public class BootCompletedReceiver extends BroadcastReceiver {
++
++    private static final String TAG = "PocketModeReceiver";
++
++    @Override
++    public void onReceive(Context context, Intent intent) {
++        Log.d(TAG, "Starting...");
++        context.startServiceAsUser(new Intent(context, PocketModeService.class),
++                UserHandle.CURRENT);
++    }
++}
+diff --git a/pocketmode/src/org/lineageos/pocketmode/PocketModeService.java b/pocketmode/src/org/lineageos/pocketmode/PocketModeService.java
+new file mode 100644
+index 0000000..b4a982b
+--- /dev/null
++++ b/pocketmode/src/org/lineageos/pocketmode/PocketModeService.java
+@@ -0,0 +1,85 @@
++/*
++ * Copyright (C) 2016 The CyanogenMod Project
++ *               2017 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.lineageos.pocketmode;
++
++import android.app.Service;
++import android.content.BroadcastReceiver;
++import android.content.Context;
++import android.content.Intent;
++import android.content.IntentFilter;
++import android.os.IBinder;
++import android.util.Log;
++
++public class PocketModeService extends Service {
++    private static final String TAG = "PocketModeService";
++    private static final boolean DEBUG = true;
++
++    private PressureSensor mPressureSensor;
++
++    @Override
++    public void onCreate() {
++        if (DEBUG) Log.d(TAG, "Creating service");
++        mPressureSensor = new PressureSensor(this);
++
++        IntentFilter screenStateFilter = new IntentFilter();
++        screenStateFilter.addAction(Intent.ACTION_SCREEN_OFF);
++        screenStateFilter.addAction(Intent.ACTION_USER_PRESENT);
++        registerReceiver(mScreenStateReceiver, screenStateFilter);
++    }
++
++    @Override
++    public int onStartCommand(Intent intent, int flags, int startId) {
++        if (DEBUG) Log.d(TAG, "Starting service");
++        return START_STICKY;
++    }
++
++    @Override
++    public void onDestroy() {
++        if (DEBUG) Log.d(TAG, "Destroying service");
++        this.unregisterReceiver(mScreenStateReceiver);
++        mPressureSensor.disable();
++        super.onDestroy();
++    }
++
++    @Override
++    public IBinder onBind(Intent intent) {
++        return null;
++    }
++
++    private void onDeviceUnlocked() {
++        //mPressureSensor.enable();
++        mPressureSensor.read(250);
++    }
++
++    private void onDisplayOff() {
++        mPressureSensor.disable();
++    }
++
++    private BroadcastReceiver mScreenStateReceiver = new BroadcastReceiver() {
++        @Override
++        public void onReceive(Context context, Intent intent) {
++            if (intent.getAction().equals(Intent.ACTION_USER_PRESENT)) {
++                if (DEBUG) Log.d(TAG, "Device unlocked");
++                onDeviceUnlocked();
++            } else if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
++                if (DEBUG) Log.d(TAG, "Display off");
++                //onDisplayOff();
++            }
++        }
++    };
++}
+diff --git a/pocketmode/src/org/lineageos/pocketmode/PressureSensor.java b/pocketmode/src/org/lineageos/pocketmode/PressureSensor.java
+new file mode 100644
+index 0000000..32e62b7
+--- /dev/null
++++ b/pocketmode/src/org/lineageos/pocketmode/PressureSensor.java
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (C) 2016 The CyanogenMod Project
++ *               2017-2019 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.lineageos.pocketmode;
++
++import android.content.Context;
++import android.hardware.Sensor;
++import android.hardware.SensorEvent;
++import android.hardware.SensorEventListener;
++import android.hardware.SensorManager;
++import android.os.SystemClock;
++import android.util.Log;
++
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.Future;
++
++public class PressureSensor implements SensorEventListener {
++    private static final String TAG = "PocketModePressure";
++    private static final boolean DEBUG = true;
++
++    private ExecutorService mExecutorService;
++    private Context mContext;
++    private Sensor mSensor;
++    private SensorManager mSensorManager;
++
++    public PressureSensor(Context context) {
++        mContext = context;
++        mSensorManager = mContext.getSystemService(SensorManager.class);
++        mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
++        mExecutorService = Executors.newSingleThreadExecutor();
++    }
++
++    private Future<?> submit(Runnable runnable) {
++        return mExecutorService.submit(runnable);
++    }
++
++    @Override
++    public void onSensorChanged(SensorEvent event) {
++        float[] values = event.values;
++        if (DEBUG) Log.i(TAG, " mBar:" + String.format("%.3f mbar", values[0]));
++    }
++
++    @Override
++    public void onAccuracyChanged(Sensor sensor, int accuracy) {
++        /* Empty */
++    }
++
++    protected void enable() {
++        if (DEBUG) Log.d(TAG, "Enabling");
++        submit(() -> {
++            mSensorManager.registerListener(this, mSensor,
++                    SensorManager.SENSOR_DELAY_NORMAL);
++        });
++    }
++
++    protected void disable() {
++        if (DEBUG) Log.d(TAG, "Disabling");
++        submit(() -> {
++            mSensorManager.unregisterListener(this, mSensor);
++        });
++    }
++
++    protected void read(long msec) {
++        enable();
++        SystemClock.sleep(msec);
++        disable();
++    }
++}
+diff --git a/s62v71c2k_jk_eea.mk b/s62v71c2k_jk_eea.mk
+index 4ae3d4d..ff16970 100644
+--- a/s62v71c2k_jk_eea.mk
++++ b/s62v71c2k_jk_eea.mk
+@@ -12,5 +12,5 @@ PRODUCT_DEVICE := BV9500Plus
+ PRODUCT_BRAND := Blackview
+ PRODUCT_MODEL := BV9500 Plus
+ 
+-PRODUCT_PACKAGES += 
+-
++PRODUCT_PACKAGES += \
++    ProximityHelper \
+diff --git a/sepolicy/fm.te b/sepolicy/fm.te
+index 4193599..6dc1585 100644
+--- a/sepolicy/fm.te
++++ b/sepolicy/fm.te
+@@ -1,5 +1,5 @@
+ type fm_device, file_type;
+-#type fm_firmware_file, file_type;
++#type fm_firmware_file, vendor_file_type;
+ 
+ allow system_app fm_device:chr_file rw_file_perms;
+ #allow system_app fm_firmware_file:file { open read };
+-- 
+2.20.1
+

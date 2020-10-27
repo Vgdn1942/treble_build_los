@@ -1,0 +1,299 @@
+From 363d501d7623ec30f87dab9a95292061e27c18bf Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Sun, 26 Jul 2020 20:00:17 +0300
+Subject: [PATCH] Fix build FM
+
+Change-Id: Ic7dbbbed728a91db5f2161166025af4b6d407043
+---
+ jni/fmr/common.cpp    |   8 +-
+ jni/fmr/fmr_core.cpp  |  18 ++--
+ jni/fmr/libfm_jni.cpp |  36 +++----
+ 3 files changed, 32 insertions(+), 30 deletions(-)
+
+diff --git a/jni/fmr/common.cpp b/jni/fmr/common.cpp
+index 859d3b3..ad624d6 100644
+--- a/jni/fmr/common.cpp
++++ b/jni/fmr/common.cpp
+@@ -21,8 +21,6 @@
+ #endif
+ #define LOG_TAG "FMLIB_COM"
+ 
+-static int g_stopscan = 0;
+-
+ int COM_open_dev(const char *pname, int *fd)
+ {
+     int ret = 0;
+@@ -101,7 +99,7 @@ void COM_change_string(uint8_t *str, int len)
+     }
+ }
+ 
+-int COM_get_ps(int fd, RDSData_Struct *rds, uint8_t **ps, int *ps_len)
++int COM_get_ps(__attribute__((unused)) int fd, RDSData_Struct *rds, uint8_t **ps, int *ps_len)
+ {
+     int ret = 0;
+     char tmp_ps[9] = {0};
+@@ -128,7 +126,7 @@ int COM_get_ps(int fd, RDSData_Struct *rds, uint8_t **ps, int *ps_len)
+     return ret;
+ }
+ 
+-int COM_get_rt(int fd, RDSData_Struct *rds, uint8_t **rt, int *rt_len)
++int COM_get_rt(__attribute__((unused)) int fd, RDSData_Struct *rds, uint8_t **rt, int *rt_len)
+ {
+     int ret = 0;
+     char tmp_rt[65] = { 0 };
+@@ -154,7 +152,7 @@ int COM_get_rt(int fd, RDSData_Struct *rds, uint8_t **rt, int *rt_len)
+     return ret;
+ }
+ 
+-int COM_get_pi(int fd, RDSData_Struct *rds, uint16_t *pi)
++int COM_get_pi(__attribute__((unused)) int fd, RDSData_Struct *rds, uint16_t *pi)
+ {
+     int ret = 0;
+ 
+diff --git a/jni/fmr/fmr_core.cpp b/jni/fmr/fmr_core.cpp
+index 10c2511..7f2c7c5 100644
+--- a/jni/fmr/fmr_core.cpp
++++ b/jni/fmr/fmr_core.cpp
+@@ -80,17 +80,19 @@ int FMR_get_cfgs(int idx)
+     return ret;
+ }
+ 
+-int FMR_chk_cfg_data(int idx)
++int FMR_chk_cfg_data(__attribute__((unused)) int idx)
+ {
+     //TODO Need check? how to check?
+     return 0;
+ }
+ 
++/*
+ static void sig_alarm(int sig)
+ {
+     LOGI("+++Receive sig %d\n", sig);
+     return;
+ }
++*/
+ 
+ int FMR_init()
+ {
+@@ -181,11 +183,14 @@ int FMR_close_dev(int idx)
+ int FMR_pwr_up(int idx, int freq)
+ {
+     int ret = 0;
++    int tmp_freq;
++
++    tmp_freq = (int)(freq * 10);
+ 
+     FMR_ASSERT(FMR_cbk_tbl(idx).pwr_up);
+ 
+     LOGI("%s,[freq=%d]\n", __func__, freq);
+-    if (freq < fmr_data.cfg_data.low_band || freq > fmr_data.cfg_data.high_band) {
++    if (tmp_freq < fmr_data.cfg_data.low_band || tmp_freq > fmr_data.cfg_data.high_band) {
+         LOGE("%s error freq: %d\n", __func__, freq);
+         ret = -ERR_INVALID_PARA;
+         return ret;
+@@ -279,7 +284,7 @@ fm_bool FMR_DensenseDetect(fm_s32 idx, fm_u16 ChannelNo, fm_s32 RSSI)
+ 
+ fm_bool FMR_SevereDensense(fm_u16 ChannelNo, fm_s32 RSSI)
+ {
+-    fm_s32 i = 0, j = 0;
++    fm_s32 i = 0;
+     struct fm_fake_channel_t *chan_info = fmr_data.cfg_data.fake_chan;
+ 
+     ChannelNo /= 10;
+@@ -486,8 +491,7 @@ int FMR_seek_Channel(int idx, int start_freq, int min_freq, int max_freq, int ba
+ 
+ int FMR_seek(int idx, int start_freq, int dir, int *ret_freq)
+ {
+-    fm_s32 ret = 0, i, j;
+-    fm_softmute_tune_t cur_freq;
++    fm_s32 ret = 0;
+     fm_s32 band_channel_no = 0;
+     fm_u8 seek_space = 10;
+     fm_u16 min_freq, max_freq;
+@@ -578,7 +582,7 @@ int FMR_Restore_Search(int idx)
+     return 0;
+ }
+ 
+-int FMR_scan_Channels(int idx, uint16_t *scan_tbl, int *max_cnt, fm_s32 band_channel_no, fm_u16 Start_Freq, fm_u8 seek_space, fm_u8 NF_Space)
++int FMR_scan_Channels(int idx, uint16_t *scan_tbl, int *max_cnt, fm_s32 band_channel_no, fm_u16 Start_Freq, fm_u8 seek_space, __attribute__((unused)) fm_u8 NF_Space)
+ {
+     fm_s32 ret = 0, Num = 0, i, j;
+     fm_u32 ChannelNo = 0;
+@@ -768,7 +772,7 @@ int FMR_scan(int idx, uint16_t *scan_tbl, int *max_cnt)
+     return ret;
+ }
+ 
+-int FMR_stop_scan(int idx)
++int FMR_stop_scan(__attribute__((unused)) int idx)
+ {
+     fmr_data.scan_stop = fm_true;
+     return 0;
+diff --git a/jni/fmr/libfm_jni.cpp b/jni/fmr/libfm_jni.cpp
+index a906887..5347a82 100644
+--- a/jni/fmr/libfm_jni.cpp
++++ b/jni/fmr/libfm_jni.cpp
+@@ -25,7 +25,7 @@
+ static int g_idx = -1;
+ extern struct fmr_ds fmr_data;
+ 
+-jboolean openDev(JNIEnv *env, jobject thiz)
++jboolean openDev(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+ 
+@@ -35,7 +35,7 @@ jboolean openDev(JNIEnv *env, jobject thiz)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jboolean closeDev(JNIEnv *env, jobject thiz)
++jboolean closeDev(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+ 
+@@ -45,7 +45,7 @@ jboolean closeDev(JNIEnv *env, jobject thiz)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jboolean powerUp(JNIEnv *env, jobject thiz, jfloat freq)
++jboolean powerUp(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jfloat freq)
+ {
+     int ret = 0;
+     int tmp_freq;
+@@ -58,7 +58,7 @@ jboolean powerUp(JNIEnv *env, jobject thiz, jfloat freq)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jboolean powerDown(JNIEnv *env, jobject thiz, jint type)
++jboolean powerDown(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jint type)
+ {
+     int ret = 0;
+ 
+@@ -68,7 +68,7 @@ jboolean powerDown(JNIEnv *env, jobject thiz, jint type)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jboolean tune(JNIEnv *env, jobject thiz, jfloat freq)
++jboolean tune(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jfloat freq)
+ {
+     int ret = 0;
+     int tmp_freq;
+@@ -80,7 +80,7 @@ jboolean tune(JNIEnv *env, jobject thiz, jfloat freq)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jfloat seek(JNIEnv *env, jobject thiz, jfloat freq, jboolean isUp) //jboolean isUp;
++jfloat seek(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jfloat freq, jboolean isUp) //jboolean isUp;
+ {
+     int ret = 0;
+     int tmp_freq;
+@@ -106,7 +106,7 @@ jfloat seek(JNIEnv *env, jobject thiz, jfloat freq, jboolean isUp) //jboolean is
+     return val;
+ }
+ 
+-jshortArray autoScan(JNIEnv *env, jobject thiz)
++jshortArray autoScan(JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+ #define FM_SCAN_CH_SIZE_MAX 200
+     int ret = 0;
+@@ -143,7 +143,7 @@ out:
+     return scanChlarray;
+ }
+ 
+-jshort readRds(JNIEnv *env, jobject thiz)
++jshort readRds(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+     uint16_t status = 0;
+@@ -158,7 +158,7 @@ jshort readRds(JNIEnv *env, jobject thiz)
+     return status;
+ }
+ 
+-jbyteArray getPs(JNIEnv *env, jobject thiz)
++jbyteArray getPs(JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+     jbyteArray PSname;
+@@ -176,7 +176,7 @@ jbyteArray getPs(JNIEnv *env, jobject thiz)
+     return PSname;
+ }
+ 
+-jbyteArray getLrText(JNIEnv *env, jobject thiz)
++jbyteArray getLrText(JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+     jbyteArray LastRadioText;
+@@ -194,7 +194,7 @@ jbyteArray getLrText(JNIEnv *env, jobject thiz)
+     return LastRadioText;
+ }
+ 
+-jshort activeAf(JNIEnv *env, jobject thiz)
++jshort activeAf(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+     jshort ret_freq = 0;
+@@ -208,7 +208,7 @@ jshort activeAf(JNIEnv *env, jobject thiz)
+     return ret_freq;
+ }
+ 
+-jshortArray getAFList(JNIEnv *env, jobject thiz)
++jshortArray getAFList(JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+     jshortArray AFList;
+@@ -226,7 +226,7 @@ jshortArray getAFList(JNIEnv *env, jobject thiz)
+     return AFList;
+ }
+ 
+-jint setRds(JNIEnv *env, jobject thiz, jboolean rdson)
++jint setRds(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jboolean rdson)
+ {
+     int ret = 0;
+     int onoff = -1;
+@@ -244,7 +244,7 @@ jint setRds(JNIEnv *env, jobject thiz, jboolean rdson)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jboolean stopScan(JNIEnv *env, jobject thiz)
++jboolean stopScan(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+ 
+@@ -256,7 +256,7 @@ jboolean stopScan(JNIEnv *env, jobject thiz)
+     return ret?JNI_FALSE:JNI_TRUE;
+ }
+ 
+-jint setMute(JNIEnv *env, jobject thiz, jboolean mute)
++jint setMute(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jboolean mute)
+ {
+     int ret = 0;
+ 
+@@ -277,7 +277,7 @@ jint setMute(JNIEnv *env, jobject thiz, jboolean mute)
+  *      0: NOT support
+  *      -1: error
+  ******************************************/
+-jint isRdsSupport(JNIEnv *env, jobject thiz)
++jint isRdsSupport(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz)
+ {
+     int ret = 0;
+     int supt = -1;
+@@ -301,7 +301,7 @@ jint isRdsSupport(JNIEnv *env, jobject thiz)
+  *          1: Failed
+  *          2: Not support
+  ******************************************/
+-jint switchAntenna(JNIEnv *env, jobject thiz, jint antenna)
++jint switchAntenna(__attribute__((unused)) JNIEnv *env, __attribute__((unused)) jobject thiz, jint antenna)
+ {
+     int ret = 0;
+     jint jret = 0;
+@@ -407,7 +407,7 @@ typedef union {
+     void* venv;
+ } UnionJNIEnvToVoid;
+ 
+-jint JNI_OnLoad(JavaVM* vm, void* reserved)
++jint JNI_OnLoad(JavaVM* vm, __attribute__((unused)) void* reserved)
+ {
+     UnionJNIEnvToVoid uenv;
+     uenv.venv = NULL;
+-- 
+2.20.1
+

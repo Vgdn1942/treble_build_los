@@ -1,0 +1,597 @@
+From f0c939828b528079c6ca5369d942ef728227d199 Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Sun, 26 Jul 2020 22:19:05 +0300
+Subject: [PATCH] Make QS columns count configurable
+
+Change-Id: Ib81b0a718a936e6ac6141970280453889d186c6a
+---
+ core/java/android/provider/Settings.java      |  38 ++++-
+ .../SystemUI/res/menu/qs_customize_menu.xml   |  63 ++++++++
+ packages/SystemUI/res/values/cm_strings.xml   |  12 ++
+ .../android/systemui/qs/PagedTileLayout.java  |   8 +
+ .../com/android/systemui/qs/QSFragment.java   |   5 +
+ .../src/com/android/systemui/qs/QSPanel.java  |  10 ++
+ .../com/android/systemui/qs/QuickQSPanel.java |   4 +
+ .../com/android/systemui/qs/TileLayout.java   |  28 +++-
+ .../systemui/qs/customize/QSCustomizer.java   | 144 ++++++++++++++++--
+ .../systemui/qs/customize/TileAdapter.java    |  15 +-
+ 10 files changed, 299 insertions(+), 28 deletions(-)
+ create mode 100644 packages/SystemUI/res/menu/qs_customize_menu.xml
+
+diff --git a/core/java/android/provider/Settings.java b/core/java/android/provider/Settings.java
+index de3b1e54656..214ceb7f069 100644
+--- a/core/java/android/provider/Settings.java
++++ b/core/java/android/provider/Settings.java
+@@ -4504,13 +4504,6 @@ public final class Settings {
+         /** @hide */
+         private static final Validator SHOW_BATTERY_PERCENT_VALIDATOR = BOOLEAN_VALIDATOR;
+ 
+-        /**
+-         * IMPORTANT: If you add a new public settings you also have to add it to
+-         * PUBLIC_SETTINGS below. If the new setting is hidden you have to add
+-         * it to PRIVATE_SETTINGS below. Also add a validator that can validate
+-         * the setting value. See an example above.
+-         */
+-
+         /**
+           * Volume keys control cursor in text fields (default is 0)
+           * 0 - Disabled
+@@ -4520,6 +4513,30 @@ public final class Settings {
+           */
+         public static final String VOLUME_KEY_CURSOR_CONTROL = "volume_key_cursor_control";
+ 
++        /**
++         * Number of qs columns on landscape orientation
++         * @hide
++         */
++        public static final String OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE = "qs_layout_columns_landscape";
++         /** @hide */
++        private static final Validator OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE_VALIDATOR =
++                ANY_INTEGER_VALIDATOR;
++        /**
++         * Number of qs columns on portrait orientation
++         * @hide
++         */
++        public static final String OMNI_QS_LAYOUT_COLUMNS = "qs_layout_columns";
++         /** @hide */
++        private static final Validator OMNI_QS_LAYOUT_COLUMNS_VALIDATOR =
++                ANY_INTEGER_VALIDATOR;
++
++        /**
++         * IMPORTANT: If you add a new public settings you also have to add it to
++         * PUBLIC_SETTINGS below. If the new setting is hidden you have to add
++         * it to PRIVATE_SETTINGS below. Also add a validator that can validate
++         * the setting value. See an example above.
++         */
++
+         /**
+          * Settings to backup. This is here so that it's in the same place as the settings
+          * keys and easy to update.
+@@ -4585,6 +4602,8 @@ public final class Settings {
+             DISPLAY_COLOR_MODE,
+             ALARM_ALERT,
+             NOTIFICATION_LIGHT_PULSE,
++            OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE,
++            OMNI_QS_LAYOUT_COLUMNS,
+         };
+ 
+         /**
+@@ -4704,6 +4723,8 @@ public final class Settings {
+             PRIVATE_SETTINGS.add(EGG_MODE);
+             PRIVATE_SETTINGS.add(SHOW_BATTERY_PERCENT);
+             PRIVATE_SETTINGS.add(DISPLAY_COLOR_MODE);
++            PRIVATE_SETTINGS.add(OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE);
++            PRIVATE_SETTINGS.add(OMNI_QS_LAYOUT_COLUMNS);
+         }
+ 
+         /**
+@@ -4799,6 +4820,9 @@ public final class Settings {
+             VALIDATORS.put(NOTIFICATION_LIGHT_PULSE, BOOLEAN_VALIDATOR);
+             VALIDATORS.put(ACCELEROMETER_ROTATION_ANGLES,
+                     ACCELEROMETER_ROTATION_ANGLES_VALIDATOR);
++            VALIDATORS.put(OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE,
++                    OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE_VALIDATOR);
++            VALIDATORS.put(OMNI_QS_LAYOUT_COLUMNS, OMNI_QS_LAYOUT_COLUMNS_VALIDATOR);
+         }
+ 
+         /**
+diff --git a/packages/SystemUI/res/menu/qs_customize_menu.xml b/packages/SystemUI/res/menu/qs_customize_menu.xml
+new file mode 100644
+index 00000000000..5125611511d
+--- /dev/null
++++ b/packages/SystemUI/res/menu/qs_customize_menu.xml
+@@ -0,0 +1,63 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2009 The Android Open Source Project
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++-->
++
++<menu xmlns:android="http://schemas.android.com/apk/res/android">
++        <item android:id="@+id/menu_item_columns"
++              android:title="@string/qs_menu_item_columns">
++            <menu>
++                <item android:id="@+id/menu_item_columns_three"
++                      android:title="@string/qs_menu_item_columns_three"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_four"
++                      android:title="@string/qs_menu_item_columns_four"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_five"
++                      android:title="@string/qs_menu_item_columns_five"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_six"
++                      android:title="@string/qs_menu_item_columns_six"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_seven"
++                      android:title="@string/qs_menu_item_columns_seven"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_eight"
++                      android:title="@string/qs_menu_item_columns_eight"
++                      android:checkable="true" />
++            </menu>
++        </item>
++        <item android:id="@+id/menu_item_columns_landscape"
++              android:title="@string/qs_menu_item_columns_landscape">
++            <menu>
++                <item android:id="@+id/menu_item_columns_landscape_four"
++                      android:title="@string/qs_menu_item_columns_four"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_landscape_five"
++                      android:title="@string/qs_menu_item_columns_five"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_landscape_six"
++                      android:title="@string/qs_menu_item_columns_six"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_landscape_seven"
++                      android:title="@string/qs_menu_item_columns_seven"
++                      android:checkable="true" />
++                <item android:id="@+id/menu_item_columns_landscape_eight"
++                      android:title="@string/qs_menu_item_columns_eight"
++                      android:checkable="true" />
++            </menu>
++        </item>
++        <item android:id="@+id/menu_item_reset"
++              android:title="@string/qs_menu_item_reset"/>
++</menu>
+diff --git a/packages/SystemUI/res/values/cm_strings.xml b/packages/SystemUI/res/values/cm_strings.xml
+index 5192048d6a6..6f61d3ccb08 100644
+--- a/packages/SystemUI/res/values/cm_strings.xml
++++ b/packages/SystemUI/res/values/cm_strings.xml
+@@ -131,4 +131,16 @@
+ 
+     <!-- Lineage clock -->
+     <string name="clock_title_lineage" translatable="false">LineageOS</string>
++
++    <!-- QS Config -->
++    <string name="qs_menu_item_columns">Columns</string>
++    <string name="qs_menu_item_columns_landscape">Columns landscape</string>
++    <string name="qs_menu_item_columns_three">3</string>
++    <string name="qs_menu_item_columns_four">4</string>
++    <string name="qs_menu_item_columns_five">5</string>
++    <string name="qs_menu_item_columns_six">6</string>
++    <string name="qs_menu_item_columns_seven">7</string>
++    <string name="qs_menu_item_columns_eight">8</string>
++    <string name="qs_menu_item_columns_nine">9</string>
++    <string name="qs_menu_item_reset">Reset</string>
+ </resources>
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/PagedTileLayout.java b/packages/SystemUI/src/com/android/systemui/qs/PagedTileLayout.java
+index 0403a0505b0..c03ebd15f06 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/PagedTileLayout.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/PagedTileLayout.java
+@@ -494,4 +494,12 @@ public class PagedTileLayout extends ViewPager implements QSTileLayout {
+     public interface PageListener {
+         void onPageChanged(boolean isFirst);
+     }
++
++    @Override
++    public void updateSettings() {
++        for (int i = 0; i < mPages.size(); i++) {
++            mPages.get(i).updateSettings();
++        }
++        distributeTiles();
++    }
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/QSFragment.java b/packages/SystemUI/src/com/android/systemui/qs/QSFragment.java
+index 0a3b43a78f1..b16f1dafbbd 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/QSFragment.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/QSFragment.java
+@@ -462,6 +462,11 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
+         // Let the panel know the position changed and it needs to update where notifications
+         // and whatnot are.
+         mPanelView.onQsHeightChanged();
++
++        // when we come back from customize update
++        if (!mQSCustomizer.isCustomizing()) {
++            mQSPanel.updateSettings();
++        }
+     }
+ 
+     /**
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java b/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java
+index 62d38bc176b..b2e404d0dd6 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/QSPanel.java
+@@ -134,6 +134,8 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
+         mQsTileRevealController = new QSTileRevealController(mContext, this,
+                 (PagedTileLayout) mTileLayout);
+ 
++        updateSettings();
++
+         addDivider();
+ 
+         mFooter = new QSSecurityFooter(this, context);
+@@ -725,10 +727,18 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
+ 
+         boolean updateResources();
+ 
++        void updateSettings();
++
+         void setListening(boolean listening);
+ 
+         default void setExpansion(float expansion) {}
+ 
+         int getNumVisibleTiles();
+     }
++
++    public void updateSettings() {
++        if (mTileLayout != null) {
++            mTileLayout.updateSettings();
++        }
++    }
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/QuickQSPanel.java b/packages/SystemUI/src/com/android/systemui/qs/QuickQSPanel.java
+index e41e193c26f..7ba9ad081b7 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/QuickQSPanel.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/QuickQSPanel.java
+@@ -306,5 +306,9 @@ public class QuickQSPanel extends QSPanel {
+         protected int getColumnStart(int column) {
+             return getPaddingStart() + column *  (mCellWidth + mCellMarginHorizontal);
+         }
++
++        @Override
++        public void updateSettings() {
++        }
+     }
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/TileLayout.java b/packages/SystemUI/src/com/android/systemui/qs/TileLayout.java
+index 14addb99c0c..28f61c681e1 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/TileLayout.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/TileLayout.java
+@@ -1,7 +1,10 @@
+ package com.android.systemui.qs;
+ 
+ import android.content.Context;
++import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.os.UserHandle;
++import android.provider.Settings;
+ import android.util.AttributeSet;
+ import android.view.View;
+ import android.view.ViewGroup;
+@@ -25,6 +28,7 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
+     protected int mCellMarginVertical;
+     protected int mSidePadding;
+     protected int mRows = 1;
++    protected int mDefaultColumns;
+ 
+     protected final ArrayList<TileRecord> mRecords = new ArrayList<>();
+     private int mCellMarginTop;
+@@ -82,18 +86,13 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
+ 
+     public boolean updateResources() {
+         final Resources res = mContext.getResources();
+-        final int columns = Math.max(1, res.getInteger(R.integer.quick_settings_num_columns));
+         mCellHeight = mContext.getResources().getDimensionPixelSize(R.dimen.qs_tile_height);
+         mCellMarginHorizontal = res.getDimensionPixelSize(R.dimen.qs_tile_margin_horizontal);
+         mCellMarginVertical= res.getDimensionPixelSize(R.dimen.qs_tile_margin_vertical);
+         mCellMarginTop = res.getDimensionPixelSize(R.dimen.qs_tile_margin_top);
+         mSidePadding = res.getDimensionPixelOffset(R.dimen.qs_tile_layout_margin_side);
+         mMaxAllowedRows = Math.max(1, getResources().getInteger(R.integer.quick_settings_max_rows));
+-        if (mColumns != columns) {
+-            mColumns = columns;
+-            requestLayout();
+-            return true;
+-        }
++        updateSettings();
+         return false;
+     }
+ 
+@@ -202,4 +201,21 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
+     public int getNumVisibleTiles() {
+         return mRecords.size();
+     }
++
++    public void updateSettings() {
++        final Resources res = mContext.getResources();
++        mDefaultColumns = Math.max(1, res.getInteger(R.integer.quick_settings_num_columns));
++        boolean isPortrait = res.getConfiguration().orientation
++                == Configuration.ORIENTATION_PORTRAIT;
++        int columns = Settings.System.getIntForUser(
++                mContext.getContentResolver(), Settings.System.OMNI_QS_LAYOUT_COLUMNS, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        int columnsLandscape = Settings.System.getIntForUser(
++                mContext.getContentResolver(), Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        if (mColumns != (isPortrait ? columns : columnsLandscape)) {
++            mColumns = isPortrait ? columns : columnsLandscape;
++            requestLayout();
++        }
++    }
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/customize/QSCustomizer.java b/packages/SystemUI/src/com/android/systemui/qs/customize/QSCustomizer.java
+index 38153ecd59c..444b0a718a5 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/customize/QSCustomizer.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/customize/QSCustomizer.java
+@@ -21,11 +21,19 @@ import android.animation.AnimatorListenerAdapter;
+ import android.content.Context;
+ import android.content.res.Configuration;
+ import android.os.Bundle;
++import android.content.res.Resources;
++import android.content.Intent;
++import android.os.UserHandle;
++import android.provider.Settings;
++import androidx.recyclerview.widget.DefaultItemAnimator;
++import androidx.recyclerview.widget.GridLayoutManager;
++import androidx.recyclerview.widget.RecyclerView;
+ import android.util.AttributeSet;
+ import android.util.TypedValue;
+ import android.view.ContextThemeWrapper;
+ import android.view.LayoutInflater;
+ import android.view.Menu;
++import android.view.MenuInflater;
+ import android.view.MenuItem;
+ import android.view.View;
+ import android.widget.LinearLayout;
+@@ -38,6 +46,7 @@ import androidx.recyclerview.widget.RecyclerView;
+ 
+ import com.android.internal.logging.MetricsLogger;
+ import com.android.internal.logging.nano.MetricsProto;
++import com.android.settingslib.Utils;
+ import com.android.systemui.R;
+ import com.android.systemui.keyguard.ScreenLifecycle;
+ import com.android.systemui.plugins.qs.QS;
+@@ -62,7 +71,6 @@ import javax.inject.Inject;
+  */
+ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListener {
+ 
+-    private static final int MENU_RESET = Menu.FIRST;
+     private static final String EXTRA_QS_CUSTOMIZING = "qs_customizing";
+     private static final String TAG = "QSCustomizer";
+ 
+@@ -85,6 +93,10 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+     private int mY;
+     private boolean mOpening;
+     private boolean mIsShowingNavBackdrop;
++    private GridLayoutManager mLayout;
++    private int mDefaultColumns;
++    private Menu mColumnsSubMenu;
++    private Menu mColumnsLandscapeSubMenu;
+ 
+     @Inject
+     public QSCustomizer(Context context, AttributeSet attrs,
+@@ -107,18 +119,33 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+             }
+         });
+         mToolbar.setOnMenuItemClickListener(this);
+-        mToolbar.getMenu().add(Menu.NONE, MENU_RESET, 0,
+-                mContext.getString(com.android.internal.R.string.reset));
++        MenuInflater menuInflater = new MenuInflater(mContext);
++        menuInflater.inflate(R.menu.qs_customize_menu, mToolbar.getMenu());
++        MenuItem menuItem = mToolbar.getMenu().findItem(R.id.menu_item_columns);
++        if (menuItem != null) {
++            mColumnsSubMenu = menuItem.getSubMenu();
++        }
++        MenuItem menuItemLand = mToolbar.getMenu().findItem(R.id.menu_item_columns_landscape);
++        if (menuItemLand != null) {
++            mColumnsLandscapeSubMenu = menuItemLand.getSubMenu();
++        }
++        updateColumnsMenu();
++        int accentColor = Utils.getColorAccentDefaultColor(context);
++        mToolbar.setTitleTextColor(accentColor);
++        mToolbar.getNavigationIcon().setTint(accentColor);
++        mToolbar.getOverflowIcon().setTint(accentColor);
+         mToolbar.setTitle(R.string.qs_edit);
+-        mRecyclerView = findViewById(android.R.id.list);
++        mDefaultColumns = Math.max(1,
++                    mContext.getResources().getInteger(R.integer.quick_settings_num_columns));
++        mRecyclerView = (RecyclerView) findViewById(android.R.id.list);
+         mTransparentView = findViewById(R.id.customizer_transparent_view);
+         mTileAdapter = new TileAdapter(getContext());
+         mTileQueryHelper = new TileQueryHelper(context, mTileAdapter);
+         mRecyclerView.setAdapter(mTileAdapter);
+         mTileAdapter.getItemTouchHelper().attachToRecyclerView(mRecyclerView);
+-        GridLayoutManager layout = new GridLayoutManager(getContext(), 3);
+-        layout.setSpanSizeLookup(mTileAdapter.getSizeLookup());
+-        mRecyclerView.setLayoutManager(layout);
++        mLayout = new GridLayoutManager(getContext(), mDefaultColumns);
++        mLayout.setSpanSizeLookup(mTileAdapter.getSizeLookup());
++        mRecyclerView.setLayoutManager(mLayout);
+         mRecyclerView.addItemDecoration(mTileAdapter.getItemDecoration());
+         DefaultItemAnimator animator = new DefaultItemAnimator();
+         animator.setMoveDuration(TileAdapter.MOVE_DURATION);
+@@ -151,6 +178,7 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+             navBackdrop.setVisibility(mIsShowingNavBackdrop ? View.VISIBLE : View.GONE);
+         }
+         updateNavColors();
++        updateSettings();
+     }
+ 
+     private void updateNavColors() {
+@@ -217,6 +245,12 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+         if (isShown) {
+             MetricsLogger.hidden(getContext(), MetricsProto.MetricsEvent.QS_EDIT);
+             isShown = false;
++            if (mColumnsSubMenu != null) {
++                mColumnsSubMenu.close();
++            }
++            if (mColumnsLandscapeSubMenu != null) {
++                mColumnsLandscapeSubMenu.close();
++            }
+             mToolbar.dismissPopupMenus();
+             setCustomizing(false);
+             save();
+@@ -247,12 +281,52 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+ 
+     @Override
+     public boolean onMenuItemClick(MenuItem item) {
+-        switch (item.getItemId()) {
+-            case MENU_RESET:
+-                MetricsLogger.action(getContext(), MetricsProto.MetricsEvent.ACTION_QS_EDIT_RESET);
+-                reset();
+-                break;
++        int id = item.getItemId();
++        if (id == R.id.menu_item_reset) {
++            MetricsLogger.action(getContext(), MetricsProto.MetricsEvent.ACTION_QS_EDIT_RESET);
++            reset();
++        } else if (id == R.id.menu_item_columns_three) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS, 3, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_four) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS, 4, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_five) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS, 5, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_six) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS, 6, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_seven) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS, 7, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_eight) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS, 8, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_landscape_four) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, 4, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_landscape_five) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, 5, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_landscape_six) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, 6, UserHandle.USER_CURRENT);
++        } else if (id == R.id.menu_item_columns_landscape_seven) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, 7, UserHandle.USER_CURRENT);
++        } else if (id ==  R.id.menu_item_columns_landscape_eight) {
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                    Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, 8, UserHandle.USER_CURRENT);
++        /*
++        } else if (id == R.id.menu_item_titles) {
++            item.setChecked(!item.isChecked());
++            Settings.System.putIntForUser(mContext.getContentResolver(),
++                   Settings.System.OMNI_QS_TILE_TITLE_VISIBILITY, item.isChecked() ? 1 : 0,
++                   UserHandle.USER_CURRENT);
++        */
+         }
++        updateSettings();
+         return false;
+     }
+ 
+@@ -263,6 +337,13 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+             tiles.add(tile);
+         }
+         mTileAdapter.resetTileSpecs(mHost, tiles);
++        Settings.System.putIntForUser(mContext.getContentResolver(),
++                Settings.System.OMNI_QS_LAYOUT_COLUMNS, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        Settings.System.putIntForUser(mContext.getContentResolver(),
++                Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        updateSettings();
+     }
+ 
+     private void setTileSpecs() {
+@@ -356,4 +437,43 @@ public class QSCustomizer extends LinearLayout implements OnMenuItemClickListene
+             mNotifQsContainer.setCustomizerAnimating(false);
+         }
+     };
++
++    public void updateSettings() {
++        final Resources res = mContext.getResources();
++        boolean isPortrait = res.getConfiguration().orientation
++                == Configuration.ORIENTATION_PORTRAIT;
++        int columns = Settings.System.getIntForUser(
++                mContext.getContentResolver(), Settings.System.OMNI_QS_LAYOUT_COLUMNS, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        int columnsLandscape = Settings.System.getIntForUser(
++                mContext.getContentResolver(), Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        mTileAdapter.setColumnCount(isPortrait ? columns : columnsLandscape);
++        mLayout.setSpanCount(isPortrait ? columns : columnsLandscape);
++        updateColumnsMenu();
++    }
++     private void updateColumnsMenu() {
++        int columns = Settings.System.getIntForUser(
++                mContext.getContentResolver(), Settings.System.OMNI_QS_LAYOUT_COLUMNS, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        MenuItem menuItemThree = mToolbar.getMenu().findItem(R.id.menu_item_columns_three);
++        menuItemThree.setChecked(columns == 3);
++        MenuItem menuItemFour = mToolbar.getMenu().findItem(R.id.menu_item_columns_four);
++        menuItemFour.setChecked(columns == 4);
++        MenuItem menuItemFive = mToolbar.getMenu().findItem(R.id.menu_item_columns_five);
++        menuItemFive.setChecked(columns == 5);
++         int columnsLandscape = Settings.System.getIntForUser(
++                mContext.getContentResolver(), Settings.System.OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE, mDefaultColumns,
++                UserHandle.USER_CURRENT);
++        menuItemFour = mToolbar.getMenu().findItem(R.id.menu_item_columns_landscape_four);
++        menuItemFour.setChecked(columnsLandscape == 4);
++        menuItemFive = mToolbar.getMenu().findItem(R.id.menu_item_columns_landscape_five);
++        menuItemFive.setChecked(columnsLandscape == 5);
++        MenuItem menuItemSix = mToolbar.getMenu().findItem(R.id.menu_item_columns_landscape_six);
++        menuItemSix.setChecked(columnsLandscape == 6);
++        MenuItem menuItemSeven = mToolbar.getMenu().findItem(R.id.menu_item_columns_landscape_seven);
++        menuItemSeven.setChecked(columnsLandscape == 7);
++        MenuItem menuItemEight = mToolbar.getMenu().findItem(R.id.menu_item_columns_landscape_eight);
++        menuItemEight.setChecked(columnsLandscape == 8);
++    }
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/customize/TileAdapter.java b/packages/SystemUI/src/com/android/systemui/qs/customize/TileAdapter.java
+index 376151b0d96..f47c6ac8ac1 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/customize/TileAdapter.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/customize/TileAdapter.java
+@@ -516,13 +516,18 @@ public class TileAdapter extends RecyclerView.Adapter<Holder> implements TileSta
+         }
+     }
+ 
+-    private final SpanSizeLookup mSizeLookup = new SpanSizeLookup() {
++    private class OmniSpanSizeLookup extends SpanSizeLookup {
++        private int mColumns = 3;
+         @Override
+         public int getSpanSize(int position) {
+             final int type = getItemViewType(position);
+-            return type == TYPE_EDIT || type == TYPE_DIVIDER || type == TYPE_HEADER ? 3 : 1;
++            return type == TYPE_EDIT || type == TYPE_DIVIDER || type == TYPE_HEADER ? mColumns : 1;
+         }
+-    };
++        public void setColumnCount(int columns) {
++            mColumns = columns;
++        }
++    }
++    private final OmniSpanSizeLookup mSizeLookup = new OmniSpanSizeLookup();
+ 
+     private class TileItemDecoration extends ItemDecoration {
+         private final Drawable mDrawable;
+@@ -642,4 +647,8 @@ public class TileAdapter extends RecyclerView.Adapter<Holder> implements TileSta
+         public void onSwiped(ViewHolder viewHolder, int direction) {
+         }
+     };
++
++    public void setColumnCount(int columns) {
++        mSizeLookup.setColumnCount(columns);
++    }
+ }
+-- 
+2.20.1
+

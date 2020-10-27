@@ -1,0 +1,75 @@
+From db5bd1cf4c986944005ffbf772300d088079327d Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Tue, 4 Aug 2020 15:25:14 +0300
+Subject: [PATCH] Add new device
+
+Change-Id: I9161770add0f766a651be1d6b69fe2ee69ab2e0b
+---
+ BV9500Plus/BoardConfig.mk | 10 ++++++++++
+ base.mk                   |  5 +++++
+ s62v71c2k_jk_eea.mk       | 16 ++++++++++++++++
+ 3 files changed, 31 insertions(+)
+ create mode 100644 BV9500Plus/BoardConfig.mk
+ create mode 100644 s62v71c2k_jk_eea.mk
+
+diff --git a/BV9500Plus/BoardConfig.mk b/BV9500Plus/BoardConfig.mk
+new file mode 100644
+index 0000000..1f6f532
+--- /dev/null
++++ b/BV9500Plus/BoardConfig.mk
+@@ -0,0 +1,10 @@
++include build/make/target/board/generic_arm64_ab/BoardConfig.mk
++include device/phh/treble/board-base.mk
++
++ifeq ($(BOARD_SYSTEMIMAGE_PARTITION_RESERVED_SIZE),)
++BOARD_SYSTEMIMAGE_PARTITION_SIZE := 2147483648
++else
++BOARD_SYSTEMIMAGE_PARTITION_RESERVED_SIZE := 33554432
++endif
++
++BUILD_BROKEN_PHONY_TARGETS := true
+diff --git a/base.mk b/base.mk
+index 4b41c59..8b3304b 100644
+--- a/base.mk
++++ b/base.mk
+@@ -77,6 +77,7 @@ PRODUCT_PACKAGES += \
+ # Fix Offline Charging on Huawmeme
+ PRODUCT_PACKAGES += \
+ 	huawei-charger
++
+ PRODUCT_COPY_FILES += \
+ 	$(call find-copy-subdir-files,*,device/phh/treble/huawei_charger/files,system/etc/charger)
+ 
+@@ -196,3 +197,7 @@ PRODUCT_PACKAGES += \
+ 	vr_hwc \
+ 	curl \
+ 
++DEFAULT_SYSTEM_DEV_CERTIFICATE := build/target/product/security/releasekey
++PRODUCT_DEFAULT_DEV_CERTIFICATE := build/target/product/security/releasekey
++
++
+diff --git a/s62v71c2k_jk_eea.mk b/s62v71c2k_jk_eea.mk
+new file mode 100644
+index 0000000..4ae3d4d
+--- /dev/null
++++ b/s62v71c2k_jk_eea.mk
+@@ -0,0 +1,16 @@
++TARGET_GAPPS_ARCH := arm64
++$(call inherit-product, device/phh/treble/base-pre.mk)
++include build/make/target/product/aosp_arm64_ab.mk
++$(call inherit-product, vendor/vndk/vndk.mk)
++$(call inherit-product, device/phh/treble/base.mk)
++
++$(call inherit-product, device/phh/treble/gapps.mk)
++$(call inherit-product, device/phh/treble/lineage.mk)
++
++PRODUCT_NAME := s62v71c2k_jk_eea
++PRODUCT_DEVICE := BV9500Plus
++PRODUCT_BRAND := Blackview
++PRODUCT_MODEL := BV9500 Plus
++
++PRODUCT_PACKAGES += 
++
+-- 
+2.20.1
+

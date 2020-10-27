@@ -1,0 +1,559 @@
+From b8c5d7d8cf37381901d6f7456143ba894d67bb0f Mon Sep 17 00:00:00 2001
+From: vgdn1942 <vgdn1942@gmail.com>
+Date: Sun, 26 Jul 2020 22:30:39 +0300
+Subject: [PATCH] Fix build user mode and more additional
+
+Change-Id: I8ed090cd9129739827ba1fe5f1440b3c75770b4b
+---
+ base.mk                                       |  11 +-
+ cmds/mtk-sms-fwk-ready.rc                     |   4 +-
+ files/mtk-kpd.kl                              |   6 +
+ fm/fm.rc                                      |   3 +
+ gapps.mk                                      |  10 +-
+ .../lineage/res/res/values/config.xml         |   6 +
+ .../dialer/callrecord/res/values/config.xml   |  23 +++
+ remote/phh-remotectl.rc                       |   2 +-
+ sepolicy/asus.te                              |   5 -
+ sepolicy/file_contexts                        |  19 ++-
+ sepolicy/fm.te                                |   6 +
+ sepolicy/hal.te                               |  10 --
+ sepolicy/huawei.te                            |   4 +-
+ sepolicy/mediatek.te                          |   2 +-
+ sepolicy/qualcomm.te                          |   4 +-
+ sepolicy/su.te                                | 152 ------------------
+ sepolicy/treble_app.te                        |   6 +-
+ sepolicy/vndk_detect.te                       |  27 ----
+ su/Android.mk                                 |   4 +
+ twrp/twrp.rc                                  |   2 +-
+ vndk.rc                                       |  14 +-
+ 21 files changed, 91 insertions(+), 226 deletions(-)
+ create mode 100644 files/mtk-kpd.kl
+ create mode 100644 fm/fm.rc
+ create mode 100644 overlay/packages/apps/Dialer/java/com/android/dialer/callrecord/res/values/config.xml
+ delete mode 100644 sepolicy/asus.te
+ create mode 100644 sepolicy/fm.te
+ delete mode 100644 sepolicy/hal.te
+ delete mode 100644 sepolicy/su.te
+ delete mode 100644 sepolicy/vndk_detect.te
+
+diff --git a/base.mk b/base.mk
+index a9e0e1a..4b41c59 100644
+--- a/base.mk
++++ b/base.mk
+@@ -107,6 +107,7 @@ PRODUCT_COPY_FILES += \
+ 	device/phh/treble/interfaces.xml:system/etc/permissions/interfaces.xml
+ 
+ PRODUCT_COPY_FILES += \
++	device/phh/treble/files/mtk-kpd.kl:system/usr/keylayout/mtk-kpd.kl \
+ 	device/phh/treble/files/samsung-gpio_keys.kl:system/phh/samsung-gpio_keys.kl \
+ 	device/phh/treble/files/samsung-sec_touchscreen.kl:system/phh/samsung-sec_touchscreen.kl \
+ 	device/phh/treble/files/samsung-sec_touchkey.kl:system/phh/samsung-sec_touchkey.kl \
+@@ -127,7 +128,15 @@ PRODUCT_COPY_FILES += \
+ 	device/phh/treble/files/zf6-goodixfp.kl:system/phh/zf6-goodixfp.kl \
+ 	device/phh/treble/files/zf6-googlekey_input.kl:system/phh/zf6-googlekey_input.kl \
+ 
+-SELINUX_IGNORE_NEVERALLOWS := true
++SELINUX_IGNORE_NEVERALLOWS := false
++
++# FM
++PRODUCT_PACKAGES += \
++	libfmcust \
++	FMRadio
++
++PRODUCT_COPY_FILES += \
++	device/phh/treble/fm/fm.rc:system/etc/init/fm.rc
+ 
+ # Universal NoCutoutOverlay
+ PRODUCT_PACKAGES += \
+diff --git a/cmds/mtk-sms-fwk-ready.rc b/cmds/mtk-sms-fwk-ready.rc
+index e82e0a9..dce0a90 100644
+--- a/cmds/mtk-sms-fwk-ready.rc
++++ b/cmds/mtk-sms-fwk-ready.rc
+@@ -1,3 +1,3 @@
+ on property:sys.boot_completed=1
+-	exec u:r:phhsu_daemon:s0 root -- /system/bin/mtk-sms-fwk-ready slot1
+-	exec u:r:phhsu_daemon:s0 root -- /system/bin/mtk-sms-fwk-ready slot2
++	exec - root -- /system/bin/mtk-sms-fwk-ready slot1
++	exec - root -- /system/bin/mtk-sms-fwk-ready slot2
+diff --git a/files/mtk-kpd.kl b/files/mtk-kpd.kl
+new file mode 100644
+index 0000000..19fa64a
+--- /dev/null
++++ b/files/mtk-kpd.kl
+@@ -0,0 +1,5 @@
++key 114   VOLUME_DOWN
++key 115   VOLUME_UP
++key 116   POWER
++key 249   SEARCH
++key 250   CAMERA
+diff --git a/fm/fm.rc b/fm/fm.rc
+new file mode 100644
+index 0000000..0586ca1
+--- /dev/null
++++ b/fm/fm.rc
+@@ -0,0 +1,2 @@
++on property:sys.boot_completed=1
++	chown system media /dev/fm
+diff --git a/gapps.mk b/gapps.mk
+index e3039c3..2fc1a8f 100644
+--- a/gapps.mk
++++ b/gapps.mk
+@@ -31,12 +31,14 @@ GAPPS_FORCE_BROWSER_OVERRIDES := true
+ GAPPS_FORCE_WEBVIEW_OVERRIDES := true
+ PRODUCT_PACKAGES += \
+        Chrome \
+-       CalculatorGoogle \
+-       PrebuiltDeskClockGoogle \
+-       CalendarGooglePrebuilt \
+-       LatinImeGoogle \
+        phh-overrides
+ 
++#       CalculatorGoogle \
++#       PrebuiltDeskClockGoogle \
++#       CalendarGooglePrebuilt \
++#       LatinImeGoogle \
++
++
+ $(call inherit-product, vendor/opengapps/build/opengapps-packages.mk)
+ endif
+ 
+diff --git a/overlay-lineage/lineage-sdk/lineage/res/res/values/config.xml b/overlay-lineage/lineage-sdk/lineage/res/res/values/config.xml
+index 8df673a..a17ffb7 100644
+--- a/overlay-lineage/lineage-sdk/lineage/res/res/values/config.xml
++++ b/overlay-lineage/lineage-sdk/lineage/res/res/values/config.xml
+@@ -51,6 +51,12 @@
+          pulsating and RGB control would set this config to 75. -->
+     <integer name="config_deviceLightCapabilities">255</integer>
+ 
++    <!-- Default value for proximity check on screen wake
++     NOTE ! - Enable for devices that have a fast response proximity sensor (ideally < 300ms)-->
++    <bool name="config_proximityCheckOnWake">true</bool>
++    <integer name="config_proximityCheckTimeout">200</integer>
++    <bool name="config_proximityCheckOnWakeEnabledByDefault">true</bool>
++
+     <!-- Hardware keys present on the device, stored as a bit field.
+          This integer should equal the sum of the corresponding value for each
+          of the following keys present:
+diff --git a/overlay/packages/apps/Dialer/java/com/android/dialer/callrecord/res/values/config.xml b/overlay/packages/apps/Dialer/java/com/android/dialer/callrecord/res/values/config.xml
+new file mode 100644
+index 0000000..2832c87
+--- /dev/null
++++ b/overlay/packages/apps/Dialer/java/com/android/dialer/callrecord/res/values/config.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!--
++     Copyright (C) 2015 The CyanogenMod Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<resources>
++    <bool name="call_recording_enabled">true</bool>
++    <!-- 1 (MIC) for microphone audio source (default)
++         4 (VOICE_CALL) if supported by device for voice call uplink + downlink audio source -->
++    <integer name="call_recording_audio_source">4</integer>
++</resources>
+diff --git a/remote/phh-remotectl.rc b/remote/phh-remotectl.rc
+index 3e7aec1..0482d1e 100644
+--- a/remote/phh-remotectl.rc
++++ b/remote/phh-remotectl.rc
+@@ -10,4 +10,4 @@ on property:persist.sys.phh.remote=false
+ 
+ 
+ service phh-remotectl /system/bin/phh-remotectl.sh
+-   seclabel u:r:phhsu_daemon:s0
++#   seclabel u:r:phhsu_daemon:s0
+diff --git a/sepolicy/asus.te b/sepolicy/asus.te
+deleted file mode 100644
+index 64ff117..0000000
+--- a/sepolicy/asus.te
++++ /dev/null
+@@ -1,5 +0,0 @@
+-allow cameraserver phhsu_exec:file rx_file_perms;
+-
+-type asus_motor_device, file_type;
+-allow cameraserver asus_motor_device:chr_file { open read write ioctl };
+-allowxperm cameraserver asus_motor_device:chr_file ioctl { 0x4d02 };
+diff --git a/sepolicy/file_contexts b/sepolicy/file_contexts
+index 7ab5e91..cb473bd 100644
+--- a/sepolicy/file_contexts
++++ b/sepolicy/file_contexts
+@@ -1,18 +1,20 @@
+-/system/bin/phh-su                   u:object_r:phhsu_exec:s0
+-/system/bin/vndk-detect			u:object_r:vndk_detect_exec:s0
+-/system/etc/usb_audio_policy_configuration.xml	u:object_r:vendor_configs_file:s0
+-/system/bin/rw-system.sh u:object_r:phhsu_exec:s0
+-/system/bin/phh-on-boot.sh u:object_r:phhsu_exec:s0
+-/system/bin/phh-on-data.sh u:object_r:phhsu_exec:s0
+-/system/bin/asus-motor u:object_r:phhsu_exec:s0
++#/system/bin/phh-su                   u:object_r:phhsu_exec:s0
++#/system/bin/vndk-detect			u:object_r:vndk_detect_exec:s0
++#/system/etc/usb_audio_policy_configuration.xml	u:object_r:vendor_configs_file:s0
++#/system/bin/rw-system.sh u:object_r:phhsu_exec:s0
++#/system/bin/phh-on-boot.sh u:object_r:phhsu_exec:s0
++#/system/bin/phh-on-data.sh u:object_r:phhsu_exec:s0
++#/system/bin/asus-motor u:object_r:phhsu_exec:s0
+ 
+ /bt_firmware(/.*)?      u:object_r:bt_firmware_file:s0
+ 
+ /sec_storage(/.*)?      u:object_r:teecd_data_file:s0
+ /dev/dsm                u:object_r:dmd_device:s0
+ 
+-/system/bin/hw/android.hardware.biometrics.fingerprint@2.1-service.oppo.compat u:object_r:hal_fingerprint_oppo_compat_exec:s0
++#/system/bin/hw/android.hardware.biometrics.fingerprint@2.1-service.oppo.compat u:object_r:hal_fingerprint_oppo_compat_exec:s0
+ 
+ /efs u:object_r:efs_file:s0
+ 
+ /dev/smcinvoke u:object_r:smcinvoke_device:s0
++
++/dev/fm u:object_r:fm_device:s0
+diff --git a/sepolicy/fm.te b/sepolicy/fm.te
+new file mode 100644
+index 0000000..ec652a1
+--- /dev/null
++++ b/sepolicy/fm.te
+@@ -0,0 +1,5 @@
++type fm_device, file_type;
++#type fm_firmware_file, file_type;
++
++allow system_app fm_device:chr_file rw_file_perms;
++#allow system_app fm_firmware_file:file { open read };
+diff --git a/sepolicy/hal.te b/sepolicy/hal.te
+deleted file mode 100644
+index cb44422..0000000
+--- a/sepolicy/hal.te
++++ /dev/null
+@@ -1,10 +0,0 @@
+-type hal_fingerprint_oppo_compat, domain;
+-hal_client_domain(hal_fingerprint_oppo_compat, hal_fingerprint)
+-hal_server_domain(hal_fingerprint_oppo_compat, hal_fingerprint)
+-
+-type hal_fingerprint_oppo_compat_exec, exec_type, vendor_file_type, file_type;
+-init_daemon_domain(hal_fingerprint_oppo_compat)
+-
+-
+-type hal_fingerprint_oppo, domain;
+-allow hal_fingerprint_oppo vendor_default_prop:property_service { set };
+diff --git a/sepolicy/huawei.te b/sepolicy/huawei.te
+index b9e619b..35b631f 100644
+--- a/sepolicy/huawei.te
++++ b/sepolicy/huawei.te
+@@ -1,5 +1,5 @@
+-allow ueventd proc:file r_file_perms;
+-permissive ueventd;
++#allow ueventd proc:file r_file_perms;
++#permissive ueventd;
+ 
+ type teecd_data_file, file_type;
+ type dmd_device, file_type;
+diff --git a/sepolicy/mediatek.te b/sepolicy/mediatek.te
+index c4835dd..8719478 100644
+--- a/sepolicy/mediatek.te
++++ b/sepolicy/mediatek.te
+@@ -1,4 +1,4 @@
+-type hal_graphics_allocator_default, domain; 
++#type hal_graphics_allocator_default, domain; # duplicate on system/sepolicy/vendor/hal_graphics_allocator_default.te:2
+ type proc_ged, file_type; 
+ allowxperm domain proc_ged:file ioctl { 0x6700-0x67ff };
+ 
+diff --git a/sepolicy/qualcomm.te b/sepolicy/qualcomm.te
+index 2669694..351a257 100644
+--- a/sepolicy/qualcomm.te
++++ b/sepolicy/qualcomm.te
+@@ -1,9 +1,9 @@
+ type bt_firmware_file, file_type;
+-type rild, domain;
++type rild_phh, domain; # duplicate on system/sepolicy/vendor/rild.te:3
+ 
+ #me.phh.treble.qti.audio is system-signed
+ allow system_app hal_telephony_hwservice:hwservice_manager { find };
+-allow { rild system_app } { rild system_app }:binder { call transfer };
++allow { rild_phh system_app } { rild_phh system_app }:binder { call transfer };
+ 
+ #Pixel 1
+ type vnd_qcril_audio_hwservice, hwservice_manager_type;
+diff --git a/sepolicy/su.te b/sepolicy/su.te
+deleted file mode 100644
+index a0be12a..0000000
+--- a/sepolicy/su.te
++++ /dev/null
+@@ -1,152 +0,0 @@
+-type phhsu_daemon, domain, mlstrustedsubject;
+-type phhsu_exec, exec_type, file_type;
+-type phhsu_daemon_tmpfs, file_type;
+-
+-typeattribute phhsu_daemon coredomain;
+-permissive phhsu_daemon;
+-
+-tmpfs_domain(phhsu_daemon);
+-domain_auto_trans(init, phhsu_exec, phhsu_daemon);
+-file_type_auto_trans(phhsu_daemon, device, phhsu_daemon);
+-
+-allow { appdomain shell } phhsu_daemon:unix_stream_socket { connectto write read };
+-allow { appdomain shell } phhsu_daemon:sock_file { write read };
+-allow { appdomain shell } phhsu_exec:file { getattr read open execute execute_no_trans };
+-
+-create_pty(shell)
+-allowxperm shell devpts:chr_file ioctl { TCSETSF TCGETS unpriv_tty_ioctls };
+-allowxperm { phhsu_daemon untrusted_app untrusted_app_27 } untrusted_app_all_devpts:chr_file ioctl { TCSETSF TCGETS unpriv_tty_ioctls };
+-
+-allow servicemanager phhsu_daemon:dir { search read };
+-allow servicemanager phhsu_daemon:file { open read };
+-allow servicemanager phhsu_daemon:process { getattr };
+-allow servicemanager phhsu_daemon:binder { call transfer };
+-
+-typeattribute phhsu_daemon mlstrustedobject;
+-typeattribute phhsu_daemon mlstrustedsubject;
+-
+-allow shell su_exec:file getattr;
+-typeattribute su mlstrustedsubject;
+-
+-allow phhsu_daemon { system_api_service app_api_service system_server_service }:service_manager find;
+-
+-allow system_server phhsu_daemon:fifo_file { read write getattr };
+-allow system_server phhsu_daemon:fd use;
+-allow system_server phhsu_daemon:binder { call transfer };
+-allow system_server shell_devpts:chr_file { read write };
+-
+-# Add su to various domains
+-net_domain(phhsu_daemon)
+-
+-hwbinder_use(phhsu_daemon)
+-
+-allow domain untrusted_app_all_devpts:chr_file { getattr read write };
+-allow phhsu_daemon untrusted_app_all_devpts:chr_file { getattr read write open ioctl };
+-allow phhsu_daemon untrusted_app_all:fifo_file { getattr read write open ioctl };
+-allow phhsu_daemon zygote_exec:file { execute read open execute_no_trans getattr };
+-
+-allow appdomain phhsu_daemon:dir { search };
+-
+-allow phhsu_daemon self:global_capability_class_set { sys_resource sys_ptrace };
+-
+-allow phhsu_daemon self:dir rw_dir_perms;
+-allow phhsu_daemon self:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon self:lnk_file { r_file_perms execmod };
+-
+-allow phhsu_daemon adbd_exec:file { getattr read };
+-allow phhsu_daemon { rootfs same_process_hal_file system_file tmpfs }:file { mounton getattr };
+-allow phhsu_daemon self:capability { sys_admin chown setuid setgid net_raw dac_override dac_read_search kill fowner mknod };
+-allow phhsu_daemon self:capability2 { syslog };
+-allow phhsu_daemon shell_exec:file rx_file_perms;
+-allow phhsu_daemon system_file:file { rx_file_perms entrypoint };
+-allow phhsu_daemon kmsg_device:chr_file { ioctl w_file_perms };
+-allow phhsu_daemon toolbox_exec:file rx_file_perms;
+-allow phhsu_daemon system_block_device:{ lnk_file file } r_file_perms;
+-
+-allow { phhsu_daemon shell } domain:dir rw_dir_perms;
+-allow { phhsu_daemon shell } domain:file rw_file_perms;
+-allow { phhsu_daemon shell } domain:lnk_file rw_file_perms;
+-allow { phhsu_daemon shell } rootfs:file { rwx_file_perms create rename setattr unlink };
+-allow { phhsu_daemon shell } rootfs:dir rw_dir_perms;
+-allow phhsu_daemon asec_apk_file:dir rw_dir_perms;
+-
+-allow phhsu_daemon shell_devpts:chr_file rw_file_perms;
+-
+-allow phhsu_daemon app_data_file:dir rw_dir_perms;
+-allow phhsu_daemon app_data_file:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon dalvikcache_data_file:dir rw_dir_perms;
+-allow phhsu_daemon dalvikcache_data_file:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon dalvikcache_data_file:lnk_file { r_file_perms execmod };
+-allow phhsu_daemon system_data_file:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon system_data_file:dir rw_dir_perms;
+-allow phhsu_daemon system_data_file:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon system_file:dir rw_dir_perms;
+-allow phhsu_daemon system_file:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon init:unix_stream_socket { connectto };
+-allow phhsu_daemon self:process { ptrace setexec execmem setfscreate };
+-allow phhsu_daemon app_data_file:file { rwx_file_perms create rename setattr unlink };
+-allow phhsu_daemon app_data_file:dir rw_dir_perms;
+-allow phhsu_daemon ashmem_device:chr_file { execute };
+-allow phhsu_daemon dex2oat_exec:file rx_file_perms;
+-
+-
+-allow phhsu_daemon phhsu_daemon_tmpfs:file rwx_file_perms;
+-
+-allow phhsu_daemon { proc_type dev_type exec_type file_type sysfs_type fs_type phhsu_daemon }:file { rwx_file_perms create mounton setattr getattr relabelto relabelfrom unlink rename };
+-allow phhsu_daemon { proc_type dev_type exec_type file_type sysfs_type fs_type phhsu_daemon }:lnk_file { rw_file_perms create mounton setattr getattr relabelto relabelfrom unlink rename};
+-allow phhsu_daemon { proc_type dev_type exec_type file_type sysfs_type fs_type phhsu_daemon }:dir { rw_dir_perms create mounton setattr getattr relabelto relabelfrom unlink rename};
+-allow phhsu_daemon { proc_type dev_type exec_type file_type sysfs_type fs_type phhsu_daemon }:chr_file { rwx_file_perms unlink rename ioctl};
+-allow phhsu_daemon { proc_type dev_type exec_type file_type sysfs_type fs_type phhsu_daemon }:blk_file { rw_file_perms create unlink rename ioctl};
+-
+-allow phhsu_daemon device:file rwx_file_perms;
+-allow phhsu_daemon device:dir rw_dir_perms;
+-
+-allow phhsu_daemon domain:process { ptrace signal signull getattr };
+-allow phhsu_daemon selinuxfs:file rwx_file_perms;
+-allow domain phhsu_daemon:process { sigchld };
+-allow phhsu_daemon domain:binder { call transfer };
+-allow phhsu_daemon kernel:system { syslog_read syslog_mod };
+-allow phhsu_daemon kernel:security { setenforce compute_av };
+-allow phhsu_daemon domain:unix_stream_socket { getattr };
+-
+-allow phhsu_daemon logdr_socket:sock_file write;
+-allow phhsu_daemon logd:unix_stream_socket connectto;
+-
+-allow phhsu_daemon property_type:property_service { set };
+-allow phhsu_daemon property_socket:sock_file { write };
+-allow phhsu_daemon property_type:file rw_file_perms;
+-allow phhsu_daemon { hwservicemanager hwservice_manager_type }:hwservice_manager { list add find };
+-allow phhsu_daemon domain:unix_dgram_socket rw_socket_perms;
+-
+-allow phhsu_daemon tombstoned_intercept_socket:sock_file { write };
+-allow phhsu_daemon tombstoned:unix_stream_socket { connectto };
+-
+-allow phhsu_daemon { property_data_file data_file_type tmpfs }:file create_file_perms;
+-allow phhsu_daemon { property_data_file data_file_type tmpfs }:dir create_dir_perms;
+-
+-allow phhsu_daemon { tmpfs fs_type }:filesystem { mount remount unmount associate };
+-
+-allow phhsu_daemon phhsu_daemon:file relabelfrom;
+-
+-allow phhsu_daemon properties_device:dir { map };
+-allow phhsu_daemon { tmpfs }:dir { mounton };
+-allow phhsu_daemon { file_type shell_data_file system_file}:file { relabelto relabelfrom} ;
+-
+-allow phhsu_daemon domain:fd { use };
+-allow phhsu_daemon domain:unix_stream_socket { connectto ioctl getattr getopt read write shutdown };
+-allow phhsu_daemon self:netlink_kobject_uevent_socket create_socket_perms;
+-allow phhsu_daemon self:{ netlink_tcpdiag_socket } { create_socket_perms nlmsg_write nlmsg_read };
+-allow phhsu_daemon self:{ netlink_selinux_socket } { create_socket_perms };
+-
+-allow phhsu_daemon file_type:file create_file_perms;
+-allow phhsu_daemon file_type:dir create_dir_perms;
+-
+-allow phhsu_daemon domain:process { transition };
+-
+-
+-# 05-09 00:05:30.149 18450 18450 W lprename: type=1400 audit(0.0:40923): avc: denied { ioctl } for path="/dev/block/sda25" dev="tmpfs" ino=19441 ioctlcmd=0x1278 scontext=u:r:phhsu_daemon:s0 tcontext=u:object_r:super_block_device:s0 tclass=blk_file permissive=0
+-# 06-06 12:59:53.775 30150 30150 I auditd  : type=1400 audit(0.0:35585): avc: denied { ioctl } for comm="blockdev" path="/dev/block/dm-3" dev="tmpfs" ino=12687 ioctlcmd=0x125d scontext=u:r:phhsu_daemon:s0 tcontext=u:object_r:dm_device:s0 tclass=blk_file permissive=0
+-
+-allowxperm phhsu_daemon { file_type block_device }:blk_file ioctl { 0-0xffff };
+-allowxperm phhsu_daemon { super_block_device dm_device }:blk_file ioctl { 0x1278-0x127a 0x125d };
+-
+diff --git a/sepolicy/treble_app.te b/sepolicy/treble_app.te
+index 9b79aeb..082049b 100644
+--- a/sepolicy/treble_app.te
++++ b/sepolicy/treble_app.te
+@@ -1,4 +1,4 @@
+-allow system_app hal_wifi_hostapd_hwservice:hwservice_manager { add find };
++allow system_app hal_wifi_hostapd_hwservice:hwservice_manager { find };
+ allow system_app hidl_base_hwservice:hwservice_manager { add };
+ allow system_app wifi_data_file:dir create_dir_perms;
+ allow system_app wifi_data_file:file create_file_perms;
+@@ -10,8 +10,8 @@ set_prop(system_app, vendor_camera_prop);
+ 
+ type hal_ext_fingerprint_hwservice, hwservice_manager_type;
+ allow system_app hal_ext_fingerprint_hwservice:hwservice_manager { find };
+-type hal_fingerprint_default, domain;
+-allow system_app hal_fingerprint_default:binder { call };
++#type hal_fingerprint_default, domain; #duplicate on system/sepolicy/vendor/hal_fingerprint_default.te:2
++#allow system_app hal_fingerprint_default:binder { call };
+ allow system_app sysfs_power:dir r_dir_perms;
+ allow system_app sysfs_power:file rw_file_perms;
+ allow system_app sysfs_power:lnk_file read;
+diff --git a/sepolicy/vndk_detect.te b/sepolicy/vndk_detect.te
+deleted file mode 100644
+index 797094a..0000000
+--- a/sepolicy/vndk_detect.te
++++ /dev/null
+@@ -1,27 +0,0 @@
+-type vndk_detect, coredomain, domain;
+-type vndk_detect_exec, exec_type, file_type;
+-
+-init_daemon_domain(vndk_detect);
+-allow vndk_detect sepolicy_file:file r_file_perms;
+-set_prop(vndk_detect,system_prop);
+-set_prop(vndk_detect,debug_prop);
+-
+-allow vndk_detect shell_exec:file rx_file_perms;
+-allow vndk_detect toolbox_exec:file rx_file_perms;
+-#/system/bin/grep
+-allow vndk_detect system_file:file rx_file_perms;
+-
+-#mount -o bind /system/bin/adbd /sbin/adbd
+-allow vndk_detect adbd_exec:file { getattr read };
+-allow vndk_detect rootfs:file { mounton getattr };
+-allow vndk_detect self:capability { sys_admin };
+-
+-#mount -o bind /system/etc/usb_audio_policy_configuration.xml /vendor/etc/usb_audio_policy_configuration.xml
+-allow init vendor_configs_file:file { getattr mounton };
+-
+-#/sys/module/five
+-allow vndk_detect sysfs:file r_file_perms;
+-allow vndk_detect sysfs:dir r_dir_perms;
+-
+-#/proc/filesystems
+-allow vndk_detect proc_filesystems:file r_file_perms;
+diff --git a/su/Android.mk b/su/Android.mk
+index 4d2e612..0959da5 100644
+--- a/su/Android.mk
++++ b/su/Android.mk
+@@ -1,3 +1,5 @@
++ifeq ($(WITH_SU), true)
++
+ LOCAL_PATH := $(call my-dir)
+ 
+ include $(CLEAR_VARS)
+@@ -9,3 +11,5 @@ LOCAL_MODULE_CLASS := EXECUTABLES
+ LOCAL_INIT_RC := su.rc
+ 
+ include $(BUILD_PREBUILT)
++
++endif
+diff --git a/twrp/twrp.rc b/twrp/twrp.rc
+index 4ca11ea..b036ba9 100644
+--- a/twrp/twrp.rc
++++ b/twrp/twrp.rc
+@@ -1,3 +1,3 @@
+ on post-fs
+ 	exec - root -- /system/bin/vndk-detect
+-	exec u:r:phhsu_daemon:s0 root -- /system/bin/twrp.sh
++	#exec u:r:phhsu_daemon:s0 root -- /system/bin/twrp.sh
+diff --git a/vndk.rc b/vndk.rc
+index 4d7d91f..7de8f63 100644
+--- a/vndk.rc
++++ b/vndk.rc
+@@ -24,23 +24,23 @@ on property:persist.sys.phh.mainkeys=*
+     setprop qemu.hw.mainkeys ${persist.sys.phh.mainkeys}
+ 
+ on property:persist.sys.phh.oppo.dt2w=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.oppo.dt2w"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.oppo.dt2w"
+ 
+ on property:persist.sys.phh.oppo.gaming_mode=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.oppo.gaming_mode"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.oppo.gaming_mode"
+ 
+ on property:persist.sys.phh.oppo.usbotg=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.oppo.usbotg"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.oppo.usbotg"
+ 
+ on property:persist.sys.phh.xiaomi.dt2w=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.xiaomi.dt2w"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.xiaomi.dt2w"
+ 
+ on property:persist.sys.phh.disable_audio_effects=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.disable_audio_effects"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.disable_audio_effects"
+ 
+ on property:persist.sys.phh.caf.audio_policy=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.caf.audio_policy"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.caf.audio_policy"
+ 
+ on property:persist.sys.phh.vsmart.dt2w=*
+-    exec u:r:phhsu_daemon:s0 root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.vsmart.dt2w"
++    exec - root -- /system/bin/phh-prop-handler.sh "persist.sys.phh.vsmart.dt2w"
+ 
+-- 
+2.20.1
+
