@@ -1,18 +1,23 @@
-From 58d70bb0e580a67ab67c739dd642c0bfd9b8a15d Mon Sep 17 00:00:00 2001
+From de7253a5d0ad614178d34253d0e323caf4b2a83d Mon Sep 17 00:00:00 2001
 From: vgdn1942 <vgdn1942@gmail.com>
-Date: Tue, 27 Oct 2020 11:46:31 +0300
+Date: Wed, 28 Oct 2020 14:26:46 +0300
 Subject: [PATCH] Cleanup overlay
 
-Change-Id: I8eeb43eebb246e47b8c7ddab1fe767d056cd71c0
+Change-Id: I81bbae952055984da483175627cf405804650b36
 ---
- overlay.mk | 119 +----------------------------------------------------
- 1 file changed, 1 insertion(+), 118 deletions(-)
+ overlay.mk | 119 -----------------------------------------------------
+ 1 file changed, 119 deletions(-)
 
 diff --git a/overlay.mk b/overlay.mk
-index 531ccc3..d6a1821 100644
+index 531ccc3..d37478e 100644
 --- a/overlay.mk
 +++ b/overlay.mk
-@@ -6,129 +6,12 @@ PRODUCT_PACKAGES += \
+@@ -1,134 +1,15 @@
+ PRODUCT_PACKAGES += \
+ 	HardwareOverlayPicker \
+ 	QtiAudio \
+-	TrebleApp \
+ 	treble-overlay-NavBar \
  	treble-overlay-NightMode \
  	treble-overlay-SystemUI-FalseLocks \
  	treble-overlay-Telephony-LTE \
@@ -141,7 +146,6 @@ index 531ccc3..d6a1821 100644
 -	treble-overlay-xiaomi-redminote7 \
 -	treble-overlay-xiaomi-redminote8pro \
 -	treble-overlay-xiaomi-redmis2 \
-+
  
 -- 
 2.20.1
